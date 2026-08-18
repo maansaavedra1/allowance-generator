@@ -448,7 +448,7 @@ function showToast(msg,type,duration){
 var employees = [];     // {id, name, position, tier}
 var results = [];       // computed rows
 
-var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','Half day work, on leave on the other half','Absent','Non-working Holiday','Half-day work, no logs/leave found on the other half','SA < required hours','Unverified'];
+var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','Half day work, on leave on the other half','Absent','Non-working Holiday','Half-day work, unconfirmed on the other half','SA < required hours','Unverified'];
 var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','absent','nwh','halfday_unfiled','sa_below','unverified'];
 
 var DEFAULT_TIERS = [
@@ -792,7 +792,7 @@ var SH_HOUR_COLS = ['SH','SHOT','SHND','SHNDOT']; // Special (non-working) Holid
 var LABELS = {
   onsite:'Onsite', wfh:'WFH', late:'Onsite (Late)', leave:'On Leave', leave_half:'Half day work, on leave on the other half',
   absent:'Absent', nwh:'Non-working Holiday',
-  halfday_unfiled:'Half-day work, no logs/leave found on the other half',
+  halfday_unfiled:'Half-day work, unconfirmed on the other half',
   sa_below:'Below required hours', restday_off:'On Rest Day', unverified:'Unverified'
 };
 // Onsite vs WFH is the #1 identifier for anything that carries an allowance —
@@ -950,7 +950,7 @@ function parseDetailedSheet(wb, sheetName){
               counts.coa_onsite++; key='onsite';
             } else if(looksLikeHalfDay){
               if(dKey && empLeaveDates[dKey]){ key='onsite'; hasHalfDayLeaveContext=true; }
-              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No half-day leave filed/logs detected'; }
+              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No logs/leave found on the other half'; }
             } else if(lateMin>0){
               counts.late++; key='late';
             } else if(effectiveRequiredHours && totalHoursWorked < effectiveRequiredHours){
@@ -965,7 +965,7 @@ function parseDetailedSheet(wb, sheetName){
             statusSource='wfh';
             if(looksLikeHalfDay){
               if(dKey && empLeaveDates[dKey]){ key='wfh'; hasHalfDayLeaveContext=true; }
-              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No half-day leave filed/logs detected'; }
+              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No logs/leave found on the other half'; }
             } else {
               key='wfh';
             }
