@@ -444,8 +444,8 @@ function showToast(msg,type,duration){
 var employees = [];     // {id, name, position, tier}
 var results = [];       // computed rows
 
-var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','On Half-day Leave','Half Day (Onsite)','Absent','Non-working Holiday','Worked during Rest Day','Worked during Holiday','Worked during Non-working Holiday','Halfday (filed leave)','Halfday (no half day leave/logs)','SA < required hours','Unverified'];
-var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','halfday','absent','nwh','rd','rh_worked','nwh_worked','halfday_filed','halfday_unfiled','sa_below','unverified'];
+var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','On Half-day Leave','Half Day (Onsite)','Half Day (WFH)','Absent','Non-working Holiday','Halfday (filed leave)','Halfday (no half day leave/logs)','SA < required hours','Unverified'];
+var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','halfday','halfday_wfh','absent','nwh','halfday_filed','halfday_unfiled','sa_below','unverified'];
 
 var DEFAULT_TIERS = [
   ['MANAGER - 1',400,0,0],['MANAGER - 2',300,0,0],['MANAGER - 3',150,0,0],['MANAGER - 4',500,1000,0],
@@ -475,11 +475,9 @@ var DEFAULT_ELIG = {
   leave:{food:false,transpo:false,hazard:false},
   leave_half:{food:false,transpo:false,hazard:false},
   halfday:{food:false,transpo:false,hazard:false},
+  halfday_wfh:{food:false,transpo:false,hazard:false},
   absent:{food:false,transpo:false,hazard:false},
   nwh:{food:false,transpo:false,hazard:false},
-  rd:{food:true,transpo:true,hazard:true},
-  rh_worked:{food:true,transpo:true,hazard:true},
-  nwh_worked:{food:true,transpo:true,hazard:true},
   halfday_filed:{food:true,transpo:true,hazard:true},
   halfday_unfiled:{food:false,transpo:false,hazard:false},
   sa_below:{food:false,transpo:false,hazard:false},
@@ -766,9 +764,8 @@ var LH_HOUR_COLS = ['LH','LHOT','LHND','LHNDOT','DH','DHND','DHOT','DHNDOT']; //
 var SH_HOUR_COLS = ['SH','SHOT','SHND','SHNDOT']; // Special (non-working) Holiday
 
 var LABELS = {
-  onsite:'Onsite', wfh:'WFH', late:'Onsite (Late)', leave:'On Leave', leave_half:'On Half-day Leave', halfday:'Half Day',
-  absent:'Absent', nwh:'Non-working Holiday', rd:'Worked during Rest Day',
-  rh_worked:'Worked during Holiday', nwh_worked:'Worked during Non-working Holiday',
+  onsite:'Onsite', wfh:'WFH', late:'Onsite (Late)', leave:'On Leave', leave_half:'On Half-day Leave', halfday:'Half Day (Onsite)', halfday_wfh:'Half Day (WFH)',
+  absent:'Absent', nwh:'Non-working Holiday',
   halfday_filed:'Half Day (filed leave)', halfday_unfiled:'Half Day (no half day leave/logs)',
   sa_below:'Below required hours', restday_off:'On Rest Day', unverified:'Unverified'
 };
@@ -823,7 +820,7 @@ function parseDetailedSheet(wb, sheetName){
         var isHolidayTag = shiftText.indexOf('HOLIDAY')>-1;
         var isHalfDayLeaveTag = shiftText.indexOf('HALF DAY LEAVE')>-1;
         var hasTimeRange = shiftText.indexOf(' TO ')>-1;
-        var key = null, note = '', hasHalfDayLeaveContext = false;
+        var key = null, note = '', hasHalfDayLeaveContext = false, hasSpecialWorkedDayContext = false;
         // Half-day threshold, per Sprout's own formula:
         // (shift hours from start to end − break) ÷ 2. Break is a fixed 1 hour.
         // https://guide.sprout.ph/how-does-half-day-leave-work-for-employees-on-normal-shift
@@ -850,7 +847,15 @@ function parseDetailedSheet(wb, sheetName){
           var restWorkedHours = restHours>0 ? restHours : totalHoursWorked;
           if(restWorkedHours>0){
             if(effectiveRequiredHours && restWorkedHours < effectiveRequiredHours){ counts.sa_below++; key='sa_below'; }
-            else { counts.rd++; key='rd'; }
+            else {
+              // Per the reference sheet, eligibility for working a rest day now
+              // depends on clock-in method — same rule as everything else, not a
+              // fixed Yes/Yes/Yes just for being tagged Rest Day.
+              counts.rd++;
+              if(confirmedByLog){ key='onsite'; hasSpecialWorkedDayContext='Worked during Rest Day'; }
+              else if(dKey && empWfhDates[dKey]){ key='wfh'; hasSpecialWorkedDayContext='Worked during Rest Day (WFH)'; }
+              else { key='unverified'; }
+            }
           }
           else { key='restday_off'; }
         } else if(isHolidayTag){
@@ -864,8 +869,17 @@ function parseDetailedSheet(wb, sheetName){
               // Tagged as a holiday and something was logged, but not enough hours
               // to count as actually having worked it — a schedule-adjustment shortfall.
               counts.sa_below++; key='sa_below';
-            } else if(shHours>0 && lhHours<=0){ counts.nwh_worked++; key='nwh_worked'; }
-            else { counts.rh_worked++; key='rh_worked'; }
+            } else {
+              // Per the reference sheet, eligibility for working a holiday now
+              // depends on clock-in method too. Still note Regular vs Special
+              // Holiday (from the LH/SH differential columns) for context.
+              var isSpecialHoliday = shHours>0 && lhHours<=0;
+              if(isSpecialHoliday) counts.nwh_worked++; else counts.rh_worked++;
+              var holidayNoteLabel = 'Worked during '+(isSpecialHoliday?'Non-working Holiday':'Holiday');
+              if(confirmedByLog){ key='onsite'; hasSpecialWorkedDayContext=holidayNoteLabel; }
+              else if(dKey && empWfhDates[dKey]){ key='wfh'; hasSpecialWorkedDayContext=holidayNoteLabel+' (WFH)'; }
+              else { key='unverified'; }
+            }
           }
         } else if(isHalfDayLeaveTag){
           counts.halfday_filed++; key='halfday_filed';
@@ -920,7 +934,10 @@ function parseDetailedSheet(wb, sheetName){
         if(hasHalfDayLeaveContext){
           note = note ? note+' — with approved half-day leave' : 'With approved half-day leave';
         }
-        var isLocked = !!confirmedByLog || key==='halfday_filed' || key==='halfday_unfiled' || hasHalfDayLeaveContext;
+        if(hasSpecialWorkedDayContext){
+          note = note ? note+' — '+hasSpecialWorkedDayContext : hasSpecialWorkedDayContext;
+        }
+        var isLocked = !!confirmedByLog || key==='halfday_filed' || key==='halfday_unfiled' || hasHalfDayLeaveContext || !!hasSpecialWorkedDayContext;
         log.push({date:dateStr, dateKey:dKey, key:key, note:note, locked:isLocked});
         k++;
       }
