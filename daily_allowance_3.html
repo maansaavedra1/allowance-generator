@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💰</text></svg>">
+<title>Daily Allowance Generator | HR Tools</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Computes daily Food, Transportation, and Hazard Pay allowances by employee tier and attendance eligibility.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700&display=swap');
+  :root{--bg:#1a1d2e;--surface:#222640;--surface2:#272b45;--border:#333b5e;--stat-num:#dde3f0;--accent:#4ade80;--accent2:#38bdf8;--accent3:#f59e0b;--text:#dde3f0;--muted:#8892b0;--danger:#f87171;--eligible-bg:#0d2218;}
+  body.light{--bg:#f4f6fb;--surface:#fff;--surface2:#eef1f7;--border:#d0d7e8;--stat-num:#111827;--accent:#16a34a;--accent2:#0284c7;--accent3:#d97706;--text:#1a1f2e;--muted:#8892b0;--danger:#dc2626;--eligible-bg:#f0fdf4;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{display:flex;flex-direction:column;min-height:100vh;height:100%;}
+  body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;gap:14px;}
+  .back-link{font-size:11px;color:var(--muted);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:6px;transition:all .2s;margin-right:4px;}
+  .back-link:hover{color:var(--text);border-color:var(--accent3);}
+  .logo-badge{background:var(--accent3);color:#2b1a02;font-weight:700;font-size:11px;letter-spacing:2px;padding:4px 10px;border-radius:4px;}
+  header h1{font-size:16px;font-weight:600;}
+  .header-right{margin-left:auto;font-size:11px;color:var(--muted);}
+  .theme-toggle{display:flex;align-items:center;gap:8px;margin-left:20px;}
+  .toggle-switch{position:relative;width:44px;height:24px;cursor:pointer;}
+  .toggle-switch input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:24px;transition:.3s;}
+  .toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.3s;}
+  .toggle-switch input:checked+.toggle-slider{background:var(--accent2);}
+  .toggle-switch input:checked+.toggle-slider::before{transform:translateX(20px);background:#fff;}
+  .toggle-icon{font-size:14px;}
+  .main-grid{flex:1;display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 61px);}
+
+  .left-panel{background:var(--surface);border-right:1px solid var(--border);padding:20px 18px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+  .section-title{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  .hint{font-size:9px;color:var(--muted);line-height:1.5;margin-bottom:8px;}
+
+  .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);position:relative;margin-bottom:8px;}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent3);background:rgba(245,158,11,.05);}
+  .drop-zone.dz-error{border-color:#ef4444!important;background:rgba(239,68,68,.08)!important;animation:dz-shake .4s ease;}
+  @keyframes dz-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+  .drop-zone.loaded{border-color:var(--accent);background:var(--eligible-bg);}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;}
+  .drop-zone.loaded input[type=file]{pointer-events:none;z-index:0;}
+  .drop-icon{font-size:18px;margin-bottom:4px;}
+  .drop-label{font-size:12px;font-weight:600;margin-bottom:2px;}
+  .drop-hint{font-size:9px;color:var(--muted);}
+  .drop-filename{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);margin-top:4px;word-break:break-all;}
+  .remove-file-btn{display:none;margin-top:6px;background:none;border:1px solid rgba(248,113,113,.35);color:var(--danger);font-family:'Sora',sans-serif;font-size:9px;font-weight:600;padding:2px 10px;border-radius:6px;cursor:pointer;position:relative;z-index:10;transition:all .2s;}
+  .remove-file-btn:hover{background:rgba(248,113,113,.1);}
+  .drop-zone.loaded .remove-file-btn{display:inline-block;}
+
+  details.cfg{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;background:var(--bg);}
+  details.cfg summary{list-style:none;cursor:pointer;padding:9px 11px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;}
+  details.cfg summary::-webkit-details-marker{display:none;}
+  details.cfg summary::before{content:'▸';color:var(--muted);transition:transform .15s;}
+  details.cfg[open] summary::before{transform:rotate(90deg);}
+  .cfg-body{padding:0 11px 11px;}
+
+  .tier-head{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr;gap:6px;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;padding:0 10px;}
+  .tier-row{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr;gap:6px;align-items:center;padding:4px;border-radius:7px;margin-bottom:2px;transition:background .12s;}
+  .tier-row:hover{background:var(--surface2);}
+  .tier-row input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:9px;padding:5px 6px;border-radius:6px;width:100%;outline:none;min-width:0;}
+  .tier-row input.tier-name{font-weight:600;letter-spacing:.2px;}
+  .tier-row input:focus{border-color:var(--accent3);background:var(--bg);}
+
+  .elig-table{width:100%;border-collapse:collapse;font-size:9px;}
+  .elig-table th{text-align:left;color:var(--muted);font-weight:600;padding:3px 4px;text-transform:uppercase;letter-spacing:.5px;font-size:8px;}
+  .elig-table th.c{text-align:center;}
+  .elig-table td{padding:4px;border-top:1px solid rgba(255,255,255,.05);}
+  .elig-table td.c{text-align:center;}
+  .elig-table input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px;cursor:pointer;}
+  .elig-table tr.elig-primary{background:rgba(245,158,11,.08);}
+  .elig-table tr.elig-primary td:first-child{font-weight:700;color:var(--accent3);}
+  .elig-table tr.elig-group-label td{padding:6px 4px 3px;border-top:none;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+  .elig-table tr.elig-note-row td{padding:5px 4px 8px;border-top:none;font-size:8px;font-style:italic;color:var(--muted);line-height:1.5;}
+
+  .emp-search{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:7px 10px;border-radius:7px;outline:none;margin-bottom:8px;}
+  .emp-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+  .emp-row{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.05);font-size:10px;}
+  .emp-row:last-child{border-bottom:none;}
+  .emp-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .emp-row .id{font-family:'DM Mono',monospace;color:var(--muted);font-size:8px;}
+  .emp-row select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:9px;padding:2px 4px;border-radius:5px;outline:none;width:118px;}
+
+  .run-btn{width:100%;padding:11px;background:var(--accent3);color:#2b1a02;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:opacity .2s,transform .1s;}
+  .run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px);}
+  .run-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+  .right-panel{overflow-y:auto;}
+  .right-inner{padding:22px 26px;}
+  .stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 15px;}
+  .stat-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .stat-value{font-size:21px;font-weight:700;color:var(--stat-num);font-family:'DM Mono',monospace;}
+
+  .filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .filter-bar select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:6px 10px;border-radius:7px;outline:none;}
+  .filter-bar input{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:6px 10px;border-radius:7px;outline:none;width:180px;}
+  .filter-label{font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+  .export-btn{padding:6px 13px;background:transparent;border:1px solid var(--accent2);color:var(--accent2);font-family:'Sora',sans-serif;font-size:11px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;}
+  .export-btn:hover{background:var(--accent2);color:#021a0d;}
+  .export-btn.green{border-color:var(--accent);color:var(--accent);}
+  .export-btn.green:hover{background:var(--accent);color:#021a0d;}
+
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  thead th{background:var(--surface2);color:var(--muted);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:9px 9px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+  thead th.num{text-align:right;}
+  tbody tr{border-bottom:1px solid rgba(42,48,80,.5);}
+  tbody td{padding:10px 9px;vertical-align:middle;}
+  tbody td.num{text-align:right;font-family:'DM Mono',monospace;}
+  .emp-name{font-weight:600;}
+  .emp-id{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;}
+  .allow-val{font-family:'DM Mono',monospace;font-weight:700;}
+  .allow-zero{color:var(--muted);}
+  .tier-badge{display:inline-block;background:rgba(245,158,11,.12);color:var(--accent3);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(245,158,11,.25);}
+  /* Note: class name kept as .tier-badge internally, but labeled "Job Level" in the UI */
+
+  .state-box{padding:80px 32px;text-align:center;color:var(--muted);}
+  .state-icon{font-size:44px;margin-bottom:14px;}
+  .state-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;}
+  .state-sub{font-size:12px;}
+
+  .toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+  .toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;font-family:'Sora',sans-serif;font-size:12px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);animation:slideIn .2s ease;max-width:360px;}
+  .toast.success{background:#166534;color:#bbf7d0;border:1px solid #22c55e;}
+  .toast.error{background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;}
+  .toast.warning{background:#78350f;color:#fde68a;border:1px solid #f59e0b;}
+  .toast.info{background:#1e3a5f;color:#bae6fd;border:1px solid #38bdf8;}
+  .toast-icon{font-size:16px;flex-shrink:0;}
+  .toast-msg{flex:1;line-height:1.4;}
+  @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  .access-denied{position:fixed;inset:0;background:var(--bg);z-index:99998;display:none;align-items:center;justify-content:center;}
+  .day-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;display:none;align-items:flex-start;justify-content:center;padding:5vh 20px;overflow-y:auto;}
+  .day-modal-backdrop.show{display:flex;}
+  .day-modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 64px rgba(0,0,0,.4);}
+  .day-modal-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+  .day-modal-tierinfo{padding:8px 18px;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .day-modal-tierinfo .ti-joblevel{display:flex;align-items:center;gap:6px;font-size:9px;margin-bottom:6px;}
+  .day-modal-tierinfo .ti-joblevel .ti-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .day-modal-tierinfo .ti-joblevel .ti-value{font-family:'DM Mono',monospace;font-weight:700;font-size:9px;background:rgba(245,158,11,.12);color:var(--accent3);padding:1px 6px;border-radius:20px;border:1px solid rgba(245,158,11,.25);}
+  .day-modal-tierinfo .ti-cards{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .day-modal-tierinfo .ti-card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 7px;}
+  .day-modal-tierinfo .ti-card .ti-card-title{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;color:var(--text);}
+  .day-modal-tierinfo .ti-card .ti-line{display:flex;align-items:center;gap:4px;font-size:8px;padding:1px 0;}
+  .day-modal-tierinfo .ti-card .ti-line.yes{color:var(--text);}
+  .day-modal-tierinfo .ti-card .ti-line.no{color:var(--muted);}
+  .day-modal-tierinfo .ti-card .ti-check{font-size:8px;width:10px;flex-shrink:0;}
+  .day-modal-tierinfo .ti-card .ti-line.yes .ti-check{color:var(--accent);}
+  .day-modal-tierinfo .ti-card .ti-amt{margin-left:auto;font-family:'DM Mono',monospace;}
+  .day-modal-header h3{font-size:13px;font-weight:700;}
+  .day-modal-header .sub{font-size:10px;color:var(--muted);margin-top:1px;}
+  .day-modal-close{background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;line-height:1;padding:3px;}
+  .day-modal-close:hover{color:var(--text);}
+  .day-modal-body{padding:10px 18px 16px;max-height:56vh;overflow-y:auto;}
+  .day-table{width:100%;border-collapse:collapse;font-size:10px;}
+  .day-table th{text-align:left;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.5px;padding:4px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);}
+  .day-table th.num{text-align:right;}
+  .day-table td{padding:4px 6px;border-bottom:1px solid rgba(255,255,255,.05);}
+  .day-table td.num{text-align:right;font-family:'DM Mono',monospace;}
+  .day-status-badge{display:inline-block;font-size:8px;padding:1px 6px;border-radius:20px;border:1px solid rgba(239,68,68,.35);color:var(--danger);background:rgba(239,68,68,.08);}
+  .day-status-badge.paid{border-color:rgba(74,222,128,.35);color:var(--accent);background:rgba(74,222,128,.08);}
+  .day-modal-footer{padding:9px 18px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:10px;color:var(--muted);}
+  .day-modal-footer b{color:var(--text);font-family:'DM Mono',monospace;}
+  .access-denied.show{display:flex;}
+  .access-denied-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 32px;width:380px;max-width:90vw;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.3);}
+  .access-denied-icon{font-size:48px;margin-bottom:16px;}
+  .access-denied-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;}
+  .access-denied-sub{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:24px;}
+  .access-denied-btn{padding:10px 24px;border-radius:10px;border:none;background:#16a34a;color:#fff;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+
+  /* Adjustment Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:440px;max-width:calc(100vw - 40px);max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.45);overflow:hidden;}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;}
+  .modal-header .modal-icon{font-size:22px;line-height:1;}
+  .modal-title{font-size:15px;font-weight:700;margin-bottom:3px;}
+  .modal-sub{font-size:11px;color:var(--muted);line-height:1.5;}
+  .modal-body{padding:18px 24px;overflow-y:auto;flex:1;}
+  .modal-section-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:2px 0 10px;display:flex;align-items:center;gap:8px;}
+  .modal-section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  .modal-field{margin-bottom:13px;}
+  .modal-field label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+  .modal-field input,.modal-field select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:12px;padding:9px 11px;border-radius:8px;outline:none;transition:border-color .15s;}
+  .modal-field input:focus,.modal-field select:focus{border-color:var(--accent3);}
+  .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .modal-preview{background:var(--surface2);border:1px dashed var(--border);border-radius:9px;padding:10px 12px;font-size:10px;color:var(--muted);line-height:1.6;margin-top:4px;}
+  .modal-preview b{color:var(--text);font-weight:600;}
+  .modal-actions{display:flex;gap:8px;padding:16px 24px;border-top:1px solid var(--border);justify-content:flex-end;flex-shrink:0;background:var(--surface2);}
+  .modal-btn{padding:9px 20px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;border:none;transition:all .2s;}
+  .modal-btn.primary{background:var(--accent3);color:#2b1a02;}
+  .modal-btn.primary:hover{opacity:.9;transform:translateY(-1px);}
+  .modal-btn.secondary{background:none;border:1px solid var(--border);color:var(--muted);}
+  .modal-btn.secondary:hover{border-color:var(--text);color:var(--text);}
+
+  .app-footer{margin-top:auto;background:var(--surface);border-top:1px solid var(--border);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:11px;color:var(--muted);}
+  .footer-socials{display:flex;align-items:center;gap:14px;}
+  .footer-social{color:var(--muted);text-decoration:none;transition:color .2s;display:flex;align-items:center;}
+  .footer-social:hover{color:var(--text);}
+  .footer-social svg{width:16px;height:16px;fill:currentColor;}
+  .footer-brand{font-size:10px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div class="access-denied" id="access-denied">
+  <div class="access-denied-card">
+    <div class="access-denied-icon">🔒</div>
+    <div class="access-denied-title">Access Restricted</div>
+    <div class="access-denied-sub" id="access-denied-msg">You don't have access to this tool.<br>Contact your Customer Success Manager to request access.</div>
+    <button class="access-denied-btn" onclick="window.location.href='index.html'">← Back to Hub</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="adj-modal" onclick="if(event.target===this)closeAdjModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-icon">⬇</div>
+      <div>
+        <div class="modal-title">Adjustment Template Settings</div>
+        <div class="modal-sub">These fields will be written into every row of the exported template.</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-label">Adjustment details</div>
+      <div class="modal-field"><label>Adjustment Type</label><select id="m-adj-type"><option value="Basic Adjustment">Basic Adjustment</option><option value="Salary Adjustment">Salary Adjustment</option><option value="Allowance" selected>Allowance</option><option value="Reimbursable Allowance">Reimbursable Allowance</option><option value="Non Prorated Allowance">Non Prorated Allowance</option><option value="Deminimis Allowance">Deminimis Allowance</option><option value="Deminimis Adjustment">Deminimis Adjustment</option><option value="Bonus">Bonus</option><option value="Commissions">Commissions</option><option value="Overtime Adjustment">Overtime Adjustment</option><option value="Monetized Leave">Monetized Leave</option><option value="Other Non Taxable Income">Other Non Taxable Income</option><option value="Other Taxable Income">Other Taxable Income</option><option value="13th Month NonTaxable">13th Month NonTaxable</option><option value="13th Month Taxable">13th Month Taxable</option><option value="Withholding Tax">Withholding Tax</option><option value="Miscellaneous">Miscellaneous</option></select></div>
+      <div class="modal-field"><label>Adjustment Name</label><input id="m-adj-name" type="text" value="Daily Allowance"></div>
+      <div class="modal-field"><label>Adjustment Code</label><input id="m-adj-code" type="text" value="Allowance"></div>
+      <div class="modal-section-label">Tax treatment</div>
+      <div class="modal-row">
+        <div class="modal-field"><label>Apply Before Tax</label><select id="m-adj-before-tax"><option value="No" selected>No</option><option value="Yes">Yes</option></select></div>
+        <div class="modal-field"><label>Is Taxable</label><select id="m-adj-taxable"><option value="Yes" selected>Yes</option><option value="No">No</option></select></div>
+      </div>
+      <div class="modal-preview" id="adj-modal-preview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="closeAdjModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="confirmAdjExport()">Export</button>
+    </div>
+  </div>
+</div>
+
+<div class="day-modal-backdrop" id="day-modal-backdrop" onclick="if(event.target===this)closeDayModal()">
+  <div class="day-modal">
+    <div class="day-modal-header">
+      <div>
+        <h3 id="day-modal-title">Employee</h3>
+        <div class="sub" id="day-modal-sub"></div>
+      </div>
+      <button class="day-modal-close" onclick="closeDayModal()">✕</button>
+    </div>
+    <div class="day-modal-tierinfo" id="day-modal-tierinfo"></div>
+    <div class="day-modal-body" id="day-modal-body"></div>
+    <div class="day-modal-footer" id="day-modal-footer"></div>
+  </div>
+</div>
+
+<header>
+  <a class="back-link" href="index.html">← Hub</a>
+  <div class="logo-badge">V3</div>
+  <div>
+    <h1>Daily Allowance Generator</h1>
+    <p style="font-size:11px;color:var(--muted);margin-top:2px">Food / Transportation / Hazard Pay by tier &amp; attendance eligibility</p>
+  </div>
+  <div class="header-right" style="display:flex;align-items:center;gap:12px;"><span id="datetime" style="font-size:11px;color:var(--muted);margin-right:16px;font-family:'DM Mono',monospace;"></span></div>
+  <div class="theme-toggle">
+    <span class="toggle-icon">Dark</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this)">
+      <span class="toggle-slider"></span>
+    </label>
+    <span class="toggle-icon">Light</span>
+  </div>
+</header>
+
+<div class="main-grid">
+
+  <div class="left-panel">
+
+    <div>
+      <div class="section-title">Input Files</div>
+      <div class="drop-zone" id="emp-drop" ondragover="dz(event,'emp',true)" ondragleave="dz(event,'emp',false)" ondrop="dzDrop(event,'emp')">
+        <input type="file" id="emp-file" accept=".xls,.xlsx">
+        <div class="drop-icon">👤</div>
+        <div class="drop-label" id="emp-drop-label">Employee List</div>
+        <div class="drop-hint">ID, Name, Tier assignment, Required Hours, Biometric ID</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="emp-filename"></div>
+        <button class="remove-file-btn" onclick="removeEmpFile(event)">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="att-drop" ondragover="dz(event,'att',true)" ondragleave="dz(event,'att',false)" ondrop="dzDrop(event,'att')">
+        <input type="file" id="att-file" accept=".xls,.xlsx">
+        <div class="drop-icon">🗓️</div>
+        <div class="drop-label" id="att-drop-label">Attendance Report</div>
+        <div class="drop-hint">Summary + Detailed sheets</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="att-filename"></div>
+        <button class="remove-file-btn" onclick="removeAttFile(event)">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="appr-drop" ondragover="dz(event,'appr',true)" ondragleave="dz(event,'appr',false)" ondrop="dzDrop(event,'appr')">
+        <input type="file" id="appr-file" accept=".xls,.xlsx">
+        <div class="drop-icon">✅</div>
+        <div class="drop-label" id="appr-drop-label">Approval Center Report</div>
+        <div class="drop-hint">WFH (Official Business) + Leave</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="appr-filename"></div>
+        <button class="remove-file-btn" onclick="removeApprFile(event)">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="coa-drop" ondragover="dz(event,'coa',true)" ondragleave="dz(event,'coa',false)" ondrop="dzDrop(event,'coa')">
+        <input type="file" id="coa-file" accept=".xls,.xlsx">
+        <div class="drop-icon">🔑</div>
+        <div class="drop-label" id="coa-drop-label">Attendance Management</div>
+        <div class="drop-hint">Biometric / COA — confirms Onsite</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="coa-filename"></div>
+        <button class="remove-file-btn" onclick="removeCoaFile(event)">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="adj-drop" ondragover="dz(event,'adj',true)" ondragleave="dz(event,'adj',false)" ondrop="dzDrop(event,'adj')">
+        <input type="file" id="adj-file" accept=".xls,.xlsx">
+        <div class="drop-icon">📥</div>
+        <div class="drop-label" id="adj-drop-label">Adjustment Template</div>
+        <div class="drop-hint">Optional — fills your template in-place</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout Payroll</div>
+        <div class="drop-filename" id="adj-filename"></div>
+        <button class="remove-file-btn" onclick="removeAdjFile(event)">✕ Remove</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Tier Rate Table</div>
+      <details class="cfg">
+        <summary>Employee Tier · Food / Transpo / Hazard</summary>
+        <div class="cfg-body">
+          <div class="hint">Prefilled from your Multi-M reference sheet. Edit amounts or add/remove tiers as needed.</div>
+          <div class="tier-head"><span>Job Level</span><span>Food</span><span>Transpo</span><span>Hazard</span></div>
+          <div id="tier-rows"></div>
+          <button class="add-tier-btn" onclick="addTierRow()">+ Add tier</button>
+        </div>
+      </details>
+    </div>
+
+
+    <div>
+      <div class="section-title">Eligibility Matrix</div>
+      <details class="cfg">
+        <summary>Attendance status → allowance eligibility</summary>
+        <div class="cfg-body">
+          <div class="hint">Onsite and WFH are the two core identifiers of allowance — every other status ultimately resolves to one of these two, or to no allowance.</div>
+          <table class="elig-table" id="elig-table"></table>
+        </div>
+      </details>
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="computeAllowances()" disabled>Generate Report</button>
+
+  </div>
+
+  <div class="right-panel">
+    <div class="right-inner">
+
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Employees</div><div class="stat-value" id="s-emp">0</div></div>
+        <div class="stat-card"><div class="stat-label">Total Food</div><div class="stat-value" id="s-food">₱0</div></div>
+        <div class="stat-card"><div class="stat-label">Total Transpo</div><div class="stat-value" id="s-transpo">₱0</div></div>
+        <div class="stat-card"><div class="stat-label">Total Hazard</div><div class="stat-value" id="s-hazard">₱0</div></div>
+        <div class="stat-card"><div class="stat-label">Total Allowance</div><div class="stat-value" id="s-total">₱0</div></div>
+      </div>
+
+      <div class="filter-bar">
+        <input type="text" id="result-search" placeholder="Filter results…" oninput="renderResults()">
+        <select id="allow-filter" onchange="renderResults()">
+          <option value="">All employees</option>
+          <option value="has_allow">With allowance only</option>
+          <option value="no_allow">No allowance</option>
+        </select>
+        <select id="tier-category-filter" onchange="renderResults()">
+          <option value="">All Job Levels</option>
+          <option value="MANAGER">Manager</option>
+          <option value="SUPERVISOR">Supervisor</option>
+          <option value="TEAM LEADER">Team Leader</option>
+          <option value="RANK AND FILE">Rank and File</option>
+        </select>
+        <label class="filter-label"><input type="checkbox" id="hide-zero" onchange="renderResults()"> Hide ₱0 allowance</label>
+      </div>
+
+      <div class="filter-bar" style="flex-wrap:nowrap;">
+        <div style="flex:1"></div>
+        <button class="export-btn green" onclick="exportSummary()">⬇ Excel Summary</button>
+        <button class="export-btn" onclick="openAdjModal()">⬇ Adjustment Template</button>
+      </div>
+
+      <div class="table-wrap" id="results-wrap">
+        <div class="state-box">
+          <div class="state-icon">💰</div>
+          <div class="state-title">No results yet</div>
+          <div class="state-sub">Upload employee list, assign tiers, enter attendance counts, then Generate Report.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+// ─── DateTime ───
+function updateDateTime(){
+  const el=document.getElementById('datetime');
+  if(!el)return;
+  const now=new Date();
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  el.textContent=days[now.getDay()]+', '+String(now.getDate()).padStart(2,'0')+' '+months[now.getMonth()]+' '+now.getFullYear()+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+}
+updateDateTime();
+setInterval(updateDateTime,1000);
+
+function toggleTheme(cb){
+  document.body.classList.toggle('light',cb.checked);
+  localStorage.setItem('hr-theme',cb.checked?'light':'dark');
+}
+(function(){
+  const saved=localStorage.getItem('hr-theme');
+  if(saved==='light'){document.body.classList.add('light');const cb=document.getElementById('theme-toggle');if(cb)cb.checked=true;}
+})();
+
+function showToast(msg,type,duration){
+  type=type||'info'; duration=duration||4000;
+  const c=document.getElementById('toast-container');
+  const icons={success:'✓',error:'✕',warning:'⚠',info:'ℹ'};
+  const t=document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML='<span class="toast-icon">'+icons[type]+'</span><span class="toast-msg"></span>';
+  t.querySelector('.toast-msg').textContent=msg;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},duration);
+}
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+var employees = [];     // {id, name, position, tier}
+var results = [];       // computed rows
+
+var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','Half day work, on leave on the other half','Absent','Non-working Holiday','Half-day work, no logs/leave found on the other half','SA < required hours','Unverified'];
+var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','absent','nwh','halfday_unfiled','sa_below','unverified'];
+
+var DEFAULT_TIERS = [
+  ['MANAGER - 1',400,0,0],['MANAGER - 2',300,0,0],['MANAGER - 3',150,0,0],['MANAGER - 4',500,1000,0],
+  ['MANAGER - 5',200,250,0],['MANAGER - 6',150,200,0],['MANAGER - 7',150,200,100],
+  ['SUPERVISOR - 1',200,0,0],['SUPERVISOR - 2',150,0,0],['SUPERVISOR - 3',100,0,0],['SUPERVISOR - 4',100,220,0],
+  ['SUPERVISOR - 5',100,140,100],['SUPERVISOR - 6',130,200,100],['SUPERVISOR - 7',150,200,100],['SUPERVISOR - 8',100,200,100],
+  ['TEAM LEADER - 1',150,150,0],['TEAM LEADER - 2',150,150,100],['TEAM LEADER - 3',130,180,0],['TEAM LEADER - 4',100,200,0],
+  ['TEAM LEADER - 5',100,200,100],['TEAM LEADER - 6',150,200,100],['TEAM LEADER - 7',100,150,0],['TEAM LEADER - 8',100,150,100],
+  ['TEAM LEADER - 9',100,100,0],['TEAM LEADER - 10',100,100,100],['TEAM LEADER - 11',80,100,0],['TEAM LEADER - 12',80,100,100],
+  ['TEAM LEADER - 13',100,120,0],['TEAM LEADER - 14',80,80,0],['TEAM LEADER - 15',70,70,0],['TEAM LEADER - 16',70,80,0],
+  ['TEAM LEADER - 17',70,100,0],['TEAM LEADER - 18',60,100,0],['TEAM LEADER - 19',100,100,0],['TEAM LEADER - 20',90,100,0],
+  ['TEAM LEADER - 21',150,0,0],['TEAM LEADER - 22',130,0,0],['TEAM LEADER - 23',100,0,0],['TEAM LEADER - 24',200,0,0],
+  ['TEAM LEADER - 25',100,0,0],['TEAM LEADER - 26',150,0,0],
+  ['RANK AND FILE - 1',100,200,100],['RANK AND FILE - 2',100,150,100],['RANK AND FILE - 3',100,150,0],['RANK AND FILE - 4',100,100,100],
+  ['RANK AND FILE - 5',100,100,0],['RANK AND FILE - 6',80,100,0],['RANK AND FILE - 7',80,100,100],['RANK AND FILE - 8',60,70,0],
+  ['RANK AND FILE - 9',60,70,100],['RANK AND FILE - 10',60,80,0],['RANK AND FILE - 11',60,80,100],['RANK AND FILE - 12',60,60,0],
+  ['RANK AND FILE - 13',60,60,100],['RANK AND FILE - 14',80,80,100],['RANK AND FILE - 15',90,100,100],['RANK AND FILE - 16',80,60,100],
+  ['RANK AND FILE - 17',70,70,0],['RANK AND FILE - 18',60,100,0],['RANK AND FILE - 19',100,0,0],['RANK AND FILE - 20',80,0,0],
+  ['RANK AND FILE - 21',70,0,0],['RANK AND FILE - 22',50,60,0],['RANK AND FILE - 23',50,50,0],['RANK AND FILE - 24',50,0,0]
+];
+
+// eligibility[statusKey] = {food:bool, transpo:bool, hazard:bool}
+var DEFAULT_ELIG = {
+  onsite:{food:true,transpo:true,hazard:true},
+  wfh:{food:true,transpo:false,hazard:false},
+  late:{food:true,transpo:true,hazard:true},
+  leave:{food:false,transpo:false,hazard:false},
+  leave_half:{food:false,transpo:false,hazard:false},
+  absent:{food:false,transpo:false,hazard:false},
+  nwh:{food:false,transpo:false,hazard:false},
+  halfday_unfiled:{food:false,transpo:false,hazard:false},
+  sa_below:{food:false,transpo:false,hazard:false},
+  unverified:{food:false,transpo:false,hazard:false}
+};
+var eligibility = JSON.parse(JSON.stringify(DEFAULT_ELIG));
+
+// ════════════════════════════════════════════
+// TIER RATE TABLE UI
+// ════════════════════════════════════════════
+function renderTierRows(){
+  var wrap = document.getElementById('tier-rows');
+  wrap.innerHTML = '';
+  DEFAULT_TIERS.forEach(function(row, i){
+    var div = document.createElement('div');
+    div.className = 'tier-row';
+    div.innerHTML =
+      '<input type="text" class="tier-name" value="'+row[0]+'" data-i="'+i+'" data-f="name" title="'+row[0]+'">' +
+      '<input type="number" value="'+row[1]+'" data-i="'+i+'" data-f="food" title="Food">' +
+      '<input type="number" value="'+row[2]+'" data-i="'+i+'" data-f="transpo" title="Transpo">' +
+      '<input type="number" value="'+row[3]+'" data-i="'+i+'" data-f="hazard" title="Hazard">';
+    wrap.appendChild(div);
+  });
+  if(!wrap.dataset.listenerAttached){
+    wrap.addEventListener('input', function(e){
+      var t=e.target, i=+t.dataset.i, f=t.dataset.f;
+      if(f==='name') DEFAULT_TIERS[i][0]=t.value;
+      if(f==='food') DEFAULT_TIERS[i][1]=parseFloat(t.value)||0;
+      if(f==='transpo') DEFAULT_TIERS[i][2]=parseFloat(t.value)||0;
+      if(f==='hazard') DEFAULT_TIERS[i][3]=parseFloat(t.value)||0;
+    });
+    wrap.dataset.listenerAttached = 'true';
+  }
+}
+function addTierRow(){
+  DEFAULT_TIERS.push(['NEW TIER',0,0,0]);
+  renderTierRows();
+}
+
+// ════════════════════════════════════════════
+// ELIGIBILITY MATRIX UI
+// ════════════════════════════════════════════
+function renderEligTable(){
+  var t = document.getElementById('elig-table');
+  var html = '<tr><th>Status</th><th class="c">Food</th><th class="c">Transpo</th><th class="c">Hazard</th></tr>';
+  ATT_STATUSES.forEach(function(label, i){
+    var k = ATT_KEYS[i], e = eligibility[k];
+    var isPrimary = (k==='onsite' || k==='wfh');
+    if(i===0){
+      html += '<tr class="elig-group-label"><td colspan="4">Primary identifiers — every other status below ultimately resolves to one of these two (or to no allowance)</td></tr>';
+    }
+    if(i===2){
+      html += '<tr class="elig-group-label"><td colspan="4">Derived statuses</td></tr>';
+    }
+    html += '<tr'+(isPrimary?' class="elig-primary"':'')+'>' +
+      '<td>'+label+'</td>' +
+      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="food" '+(e.food?'checked':'')+'></td>' +
+      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="transpo" '+(e.transpo?'checked':'')+'></td>' +
+      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="hazard" '+(e.hazard?'checked':'')+'></td>' +
+      '</tr>';
+    if(k==='wfh'){
+      html += '<tr class="elig-note-row"><td colspan="4">If an employee works half the day and takes leave for the other half, their allowance follows whatever applies to the half they worked — Onsite or WFH, as shown above.</td></tr>';
+    }
+  });
+  t.innerHTML = html;
+  t.addEventListener('change', function(e){
+    var t2=e.target;
+    if(t2.type!=='checkbox') return;
+    eligibility[t2.dataset.k][t2.dataset.f] = t2.checked;
+  });
+}
+
+// ════════════════════════════════════════════
+// DRAG & DROP + FILE VALIDATION (shared)
+// ════════════════════════════════════════════
+function dz(e,type,over){ e.preventDefault(); document.getElementById(type+'-drop').classList.toggle('dragover',over); }
+function dzDrop(e,type){
+  e.preventDefault(); dz(e,type,false);
+  var f = e.dataTransfer.files[0];
+  if(!f) return;
+  var input = document.getElementById(type+'-file');
+  input.files = e.dataTransfer.files;
+  input.dispatchEvent(new Event('change'));
+}
+function dzError(type, msg){
+  showToast(msg, 'error', 9000);
+  var dze = document.getElementById(type+'-drop');
+  dze.classList.add('dz-error');
+  setTimeout(function(){ dze.classList.remove('dz-error'); }, 500);
+  var fi = document.getElementById(type+'-file');
+  if(fi) fi.value = '';
+}
+function readWb(file){
+  return new Promise(function(res, rej){
+    var r = new FileReader();
+    r.onload = function(e){ try{ res(XLSX.read(new Uint8Array(e.target.result), {type:'array'})); }catch(err){ rej(err); } };
+    r.onerror = rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+function validateEmpFile(rows){
+  if(!rows.length) return 'Heads up! The Employee List appears empty. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  var cols = Object.keys(rows[0]).map(function(k){return k.toLowerCase();});
+  var attCols = ['days present','days absent','total hours worked','undertime','overbreaks'];
+  if(attCols.some(function(c){ return cols.some(function(k){ return k.indexOf(c)>-1; }); }))
+    return 'Heads up! This looks like an Attendance Report, not an Employee List. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  var adjCols = ['adjustment type','adjustment amount','adjustment code','apply before tax','is taxable','status'];
+  if(adjCols.filter(function(c){ return cols.some(function(k){ return k.indexOf(c)>-1; }); }).length>=3)
+    return 'Heads up! This looks like a Payrollpie Adjustment Template, not an Employee List. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  var hasEmpId = cols.some(function(k){ return k.indexOf('employee id')>-1 || k.indexOf('emp id')>-1 || k==='id no'; });
+  if(!hasEmpId) return 'Heads up! This doesn\'t look like the Employee List Report. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  return null;
+}
+function validateAttFile(wb){
+  var sheets = wb.SheetNames;
+  if(!sheets.includes('Detailed') && sheets.length<2)
+    return 'Heads up! This doesn\'t look like the Attendance Report. Head to Sprout HR → Administration Tools → Attendance Report, export with both Summary and Detailed sheets included, then try again.';
+  var detWs = wb.Sheets['Detailed'] || wb.Sheets[sheets[1]];
+  var detRaw = detWs ? XLSX.utils.sheet_to_json(detWs,{header:1,defval:''}) : [];
+  var hasDateCol = detRaw.some(function(r){ return String(r[0]||'').trim()==='Date'; });
+  if(!hasDateCol) return 'Heads up! The file format isn\'t recognized. Make sure you\'re using the Attendance Report from Sprout HR → Administration Tools → Attendance Report. Export it and try again.';
+  if(!sheets.includes('Summary')) return 'Heads up! The Summary sheet is missing. When exporting from Sprout HR → Administration Tools → Attendance Report, make sure both Summary and Detailed sheets are included.';
+  return null;
+}
+function validateApprFile(wb){
+  var sheets = wb.SheetNames;
+  var hasOB = sheets.some(function(n){ return /official business/i.test(n); });
+  var hasLeave = sheets.some(function(n){ return /^leave$/i.test(n); });
+  if(!hasOB && !hasLeave) return 'Heads up! This doesn\'t look like the Approval Center Report. Head to Sprout HR → Approval Center → export the report (with Official Business and/or Leave sheets), then try again.';
+  return null;
+}
+function validateCoaFile(wb){
+  var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:''});
+  if(!rows.length) return 'Heads up! The Attendance Management file appears empty. Head to Sprout HR → Administration Tools → Attendance Management, export the file, and try again.';
+  var cols = Object.keys(rows[0]).map(function(k){return k.toLowerCase();});
+  var hasBioId = cols.some(function(k){ return k.indexOf('biometricid')>-1; });
+  var hasLogTime = cols.some(function(k){ return k.indexOf('logtime')>-1; });
+  if(!hasBioId || !hasLogTime) return 'Heads up! This doesn\'t look like the Attendance Management report. Head to Sprout HR → Administration Tools → Attendance Management, export the file, and try again.';
+  return null;
+}
+function validateAdjFile(wb){
+  if(!wb.SheetNames.includes('ProcessPayrollImportAdjustment'))
+    return 'Heads up! This doesn\'t look like the correct Adjustment Template. Head to Sprout Payroll → Payroll → Upload Adjustment → Download Excel Template, then upload that file here.';
+  return null;
+}
+
+// ════════════════════════════════════════════
+// SHARED HELPERS
+// ════════════════════════════════════════════
+function normId(v){ return String(v==null?'':v).trim().toUpperCase(); }
+// Escapes user-derived strings (employee names, IDs, tiers, etc. from uploaded
+// files) before they're injected into innerHTML, to prevent HTML/script injection
+// from malformed or malicious spreadsheet content.
+function escapeHtml(v){
+  return String(v==null?'':v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+function findKey(row, patterns){
+  var keys = Object.keys(row);
+  for(var p=0;p<patterns.length;p++){
+    var re = patterns[p];
+    for(var i=0;i<keys.length;i++){ if(re.test(keys[i])) return keys[i]; }
+  }
+  return null;
+}
+function excelDateToJS(v){
+  if(v instanceof Date) return v;
+  if(typeof v==='number') return new Date(Math.round((v-25569)*86400*1000));
+  if(typeof v==='string' && v.trim()){
+    var s = v.trim();
+    var d = new Date(s);
+    if(!isNaN(d)) return d;
+    // Some exports use "Aug 10 2026 9:00AM" (no space before AM/PM, no comma
+    // after the day) which the native Date parser rejects — normalize it.
+    var s2 = s.replace(/\s+/g,' ').replace(/(\d)(AM|PM)/i, '$1 $2');
+    d = new Date(s2);
+    if(!isNaN(d)) return d;
+  }
+  return null;
+}
+function daysBetweenInclusive(a,b){
+  if(!a||!b) return 0;
+  var ms = (new Date(b.getFullYear(),b.getMonth(),b.getDate())) - (new Date(a.getFullYear(),a.getMonth(),a.getDate()));
+  return Math.max(0, Math.round(ms/86400000)+1);
+}
+function dateKey(d){ return d ? (d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()) : ''; }
+function dateKeyFromMDY(str){
+  // Detailed sheet dates come as "8/1/2026"
+  var d = excelDateToJS(str);
+  return dateKey(d);
+}
+// Resolves Onsite vs WFH when both exist for the same date (a "split" day —
+// physically onsite for part of it, WFH for the rest). COA has no time
+// granularity, so it just confirms Onsite directly. Auto push has a real
+// clock-in time, so it's compared against the approved WFH's start time —
+// whichever came first in the day determines the day's eligibility.
+function resolveOnsiteVsWfh(id, dKey, confirmedByLog, hasWfhForDate){
+  if(confirmedByLog && !hasWfhForDate) return 'onsite';
+  if(!confirmedByLog && hasWfhForDate) return 'wfh';
+  if(!confirmedByLog && !hasWfhForDate) return null;
+  if(confirmedByLog==='coa') return 'onsite'; // COA is for confirming Onsite specifically — no time to compare
+  var punchTime = (autoPushTimeByDate[id]||{})[dKey];
+  var wfhStart = (wfhStartTimeByDate[id]||{})[dKey];
+  if(punchTime==null || wfhStart==null) return 'onsite'; // can't compare — default to physical presence
+  return punchTime <= wfhStart ? 'onsite' : 'wfh';
+}
+// Tier is derived purely from Job Code — it must match a Tier Rate Table row
+// exactly (e.g. "Manager - 7"). Employee Type is disregarded entirely.
+function deriveTier(row){
+  var jobCode = String(row['Job Code']||'').trim();
+  var directMatch = DEFAULT_TIERS.find(function(t){ return t[0].toLowerCase()===jobCode.toLowerCase(); });
+  return directMatch ? directMatch[0] : '';
+}
+
+// ════════════════════════════════════════════
+// EMPLOYEE LIST UPLOAD
+// ════════════════════════════════════════════
+var employeeRequiredHours = {}; // normId -> No. of Hours to Work
+var biometricToEmpId = {};      // biometricId -> normId(employeeId)
+document.getElementById('emp-file').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      var sheetName = wb.SheetNames.find(n=>/employee/i.test(n)) || wb.SheetNames[0];
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:''});
+      var empErr = validateEmpFile(rows);
+      if(empErr){ dzError('emp', empErr); return; }
+      employeeRequiredHours = {};
+      biometricToEmpId = {};
+      var unmapped = 0;
+      employees = rows.map(function(r){
+        var id = r['Employee ID'] || r['EmployeeID'] || r['ID'] || '';
+        var last = r['Last Name'] || '';
+        var first = r['First Name'] || '';
+        var name = (last || first) ? (last+', '+first).trim() : (r['Name']||'');
+        var position = r['Position'] || r['Employee Type'] || '';
+        if(!id && !name) return null;
+        var hoursKey = findKey(r,[/No\.?\s*of\s*Hours\s*to\s*Work/i]);
+        if(hoursKey) employeeRequiredHours[normId(id)] = parseFloat(r[hoursKey])||0;
+        var bioKey = findKey(r,[/^Biometric ID$/i]);
+        if(bioKey && r[bioKey]!=='') biometricToEmpId[String(r[bioKey]).trim()] = normId(id);
+        var tier = deriveTier(r);
+        if(!tier) unmapped++;
+        return {id:String(id), name:name, position:position, tier:tier, att:{}};
+      }).filter(Boolean);
+      // Re-parse the attendance detail sheet now that required-hours are known
+      if(lastAttWorkbook && lastAttDetailSheetName){
+        detailedData = parseDetailedSheet(lastAttWorkbook, lastAttDetailSheetName);
+      }
+      // Re-parse the biometric/COA log now that Biometric ID mapping is known
+      if(lastCoaWorkbook){
+        onsiteLogDates = parseCoaLog(lastCoaWorkbook);
+        if(lastUnmappedClockInMethods.length>0){
+          showToast('Clock-in method not recognized — not counted as Onsite confirmation.', 'warning', 9000);
+        }
+      }
+      document.getElementById('emp-drop').classList.add('loaded');
+      document.getElementById('emp-drop-label').textContent = 'Employee list loaded';
+      document.getElementById('emp-filename').textContent = f.name + ' · '+employees.length+' employees';
+      recomputeAttendance();
+      document.getElementById('run-btn').disabled = employees.length===0;
+      if(unmapped>0){
+        showToast(unmapped+' of '+employees.length+' employees could not be matched to a Job Level (Job Code didn\'t match a row in the Tier Rate Table) — they\'ll show ₱0 until Job Code is corrected.', 'warning', 9000);
+      } else {
+        showToast('Loaded '+employees.length+' employees from '+f.name+' — Job Level auto-matched from Job Code.', 'success');
+      }
+    } catch(err){
+      dzError('emp', 'Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Employee List Report, then try again.');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+});
+function removeEmpFile(e){
+  e.preventDefault();
+  employees = [];
+  document.getElementById('emp-file').value = '';
+  document.getElementById('emp-drop').classList.remove('loaded');
+  document.getElementById('emp-drop-label').textContent = 'Drop Employee List Report';
+  document.getElementById('emp-filename').textContent = '';
+  document.getElementById('run-btn').disabled = true;
+}
+
+// ════════════════════════════════════════════
+// ATTENDANCE REPORT UPLOAD (Days Present / Days Absent + Detailed daily breakdown)
+// ════════════════════════════════════════════
+var attendanceData = {};   // normId -> {daysPresent, daysAbsent}
+var detailedData = {};     // normId -> {late, halfday, nwh, rd, belowHours}
+var dailyLogs = {};        // normId -> [{date, dateKey, key, note}] from the Detailed sheet
+var lastAttWorkbook = null, lastAttDetailSheetName = null;
+var REST_HOUR_COLS = ['RD','RDOT','RDND','RDNDOT','SHRD','SHRDOT','SHRDND','SHRDNDOT','LHRD','LHRDOT','LHRDND','LHRDNDOT','DHRD','DHRDND','DHRDOT','DHRDNDOT'];
+var HOLIDAY_HOUR_COLS = ['SH','SHOT','SHND','SHNDOT','LH','LHOT','LHND','LHNDOT','DH','DHND','DHOT','DHNDOT'];
+
+function timeStrToHours(v){
+  if(typeof v==='number') return v;
+  if(typeof v==='string' && v.indexOf(':')>-1){
+    var p=v.split(':'); return (parseInt(p[0])||0)+(parseInt(p[1])||0)/60;
+  }
+  return parseFloat(v)||0;
+}
+
+var LH_HOUR_COLS = ['LH','LHOT','LHND','LHNDOT','DH','DHND','DHOT','DHNDOT']; // Regular/Legal + Double Holiday
+var SH_HOUR_COLS = ['SH','SHOT','SHND','SHNDOT']; // Special (non-working) Holiday
+
+var LABELS = {
+  onsite:'Onsite', wfh:'WFH', late:'Onsite (Late)', leave:'On Leave', leave_half:'Half day work, on leave on the other half',
+  absent:'Absent', nwh:'Non-working Holiday',
+  halfday_unfiled:'Half-day work, no logs/leave found on the other half',
+  sa_below:'Below required hours', restday_off:'On Rest Day', unverified:'Unverified'
+};
+// Onsite vs WFH is the #1 identifier for anything that carries an allowance —
+// whenever the actual clock-in source is known, lead with it, even for
+// no-allowance statuses like an unfiled half day, so it's never buried in a note.
+function displayLabel(d){
+  var base = LABELS[d.key] || d.key || '—';
+  if(d.key==='onsite' || d.key==='wfh') return base; // already IS the identifier
+  if(d.source==='onsite') return 'Onsite — '+base;
+  if(d.source==='wfh') return 'WFH — '+base;
+  return base;
+}
+
+function parseDetailedSheet(wb, sheetName){
+  var out = {};
+  dailyLogs = {};
+  var ws = wb.Sheets[sheetName];
+  if(!ws) return out;
+  var aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  var i = 0;
+  while(i < aoa.length){
+    var row = aoa[i];
+    if(row[0] === 'Name:'){
+      var currentId = '';
+      // scan forward a few rows for "ID Number:"
+      var j = i+1;
+      while(j < aoa.length && aoa[j][0] !== 'Date'){
+        if(aoa[j][0] === 'ID Number:') currentId = normId(aoa[j][1]);
+        j++;
+      }
+      if(j >= aoa.length){ i = j; continue; }
+      var headerRow = aoa[j];
+      var colIdx = {};
+      headerRow.forEach(function(h,idx){ colIdx[String(h).trim()] = idx; });
+      var k = j+1;
+      var counts = {late:0, halfday_filed:0, halfday_unfiled:0, nwh:0, rd:0, rh_worked:0, nwh_worked:0, sa_below:0, coa_onsite:0, unverified:0};
+      var reqHoursForEmp = employeeRequiredHours[currentId];
+      var empLogDates = onsiteLogDates[currentId] || {};
+      var empLeaveDates = {};
+      (approvalDailyLog[currentId]||[]).forEach(function(a){ if(a.key==='leave' || a.key==='leave_half') empLeaveDates[a.dateKey] = true; });
+      var empUnmapped = unmappedLogDates[currentId] || {};
+      var empScheduleAdjDates = scheduleAdjDates[currentId] || {};
+      var empHalfDayLeaveDates = halfDayLeaveDates[currentId] || {};
+      var empWfhDates = {};
+      (approvalDailyLog[currentId]||[]).forEach(function(a){ if(a.key==='wfh') empWfhDates[a.dateKey] = true; });
+      var log = [];
+      while(k < aoa.length && aoa[k][0] && aoa[k][0] !== 'Name:'){
+        var dr = aoa[k];
+        var shiftText = String(dr[colIdx['Shift']]||'').toUpperCase();
+        var biologs = String(dr[colIdx['Biologs']]||'').toUpperCase();
+        var lateMin = parseFloat(dr[colIdx['Late']])||0;
+        var totalHoursWorked = parseFloat(dr[colIdx['Total Hours Worked']])||0;
+        var dateStr = dr[colIdx['Date']];
+        var dKey = dateKeyFromMDY(dateStr);
+        var confirmedByLog = dKey && empLogDates[dKey];
+        var hasApprovedSA = dKey && empScheduleAdjDates[dKey];
+        var restHours = REST_HOUR_COLS.reduce(function(s,c){ return s + (colIdx[c]!==undefined ? timeStrToHours(dr[colIdx[c]]) : 0); },0);
+        var lhHours = LH_HOUR_COLS.reduce(function(s,c){ return s + (colIdx[c]!==undefined ? timeStrToHours(dr[colIdx[c]]) : 0); },0);
+        var shHours = SH_HOUR_COLS.reduce(function(s,c){ return s + (colIdx[c]!==undefined ? timeStrToHours(dr[colIdx[c]]) : 0); },0);
+        var isRestDayTag = shiftText.indexOf('REST DAY')>-1;
+        var isHolidayTag = shiftText.indexOf('HOLIDAY')>-1;
+        var isHalfDayLeaveTag = shiftText.indexOf('HALF DAY LEAVE')>-1;
+        var hasTimeRange = shiftText.indexOf(' TO ')>-1;
+        var key = null, note = '', hasHalfDayLeaveContext = false, hasSpecialWorkedDayContext = false, statusSource = null;
+        // Half-day threshold, per Sprout's own formula:
+        // (shift hours from start to end − break) ÷ 2. Break is a fixed 1 hour.
+        // https://guide.sprout.ph/how-does-half-day-leave-work-for-employees-on-normal-shift
+        var halfDayThreshold = reqHoursForEmp ? ((reqHoursForEmp - 1) / 2) : null;
+        var looksLikeHalfDay = halfDayThreshold!==null && totalHoursWorked>0 && totalHoursWorked<=halfDayThreshold;
+        // "No. of Hours to Work" is the raw shift span; "Total Hours Worked" already
+        // has the break subtracted out by Sprout — net the break out of the
+        // requirement too, or a completely normal full day reads as short by 1 hour.
+        var effectiveRequiredHours = reqHoursForEmp ? (reqHoursForEmp - 1) : null;
+        // Actual worked hours can land in different columns depending on day type
+        // (Total Hours Worked for regular days, RD for rest days, LH/SH for holidays)
+        // — use whichever actually has a value for a fair cross-check.
+        var actualWorkedHours = Math.max(totalHoursWorked, restHours, lhHours+shHours);
+
+        if(hasApprovedSA && effectiveRequiredHours && actualWorkedHours < effectiveRequiredHours){
+          // An approved Schedule Adjustment is on file for this exact date — the
+          // most authoritative signal that the shift itself was changed. Cross-check
+          // actual hours worked against the employee's required hours; if it's
+          // short, this overrides any tag-based classification (Holiday, Rest Day, etc.).
+          counts.sa_below++; key='sa_below';
+        } else if(isRestDayTag){
+          // Rest-day work gets recorded under the RD differential columns, not
+          // "Total Hours Worked" — check the actual worked hours from there.
+          var restWorkedHours = restHours>0 ? restHours : totalHoursWorked;
+          if(restWorkedHours>0){
+            if(effectiveRequiredHours && restWorkedHours < effectiveRequiredHours){ counts.sa_below++; key='sa_below'; }
+            else {
+              // Per the reference sheet, eligibility for working a rest day now
+              // depends on clock-in method — same rule as everything else, not a
+              // fixed Yes/Yes/Yes just for being tagged Rest Day.
+              counts.rd++;
+              var restResolved = resolveOnsiteVsWfh(currentId, dKey, confirmedByLog, !!(dKey && empWfhDates[dKey]));
+              if(restResolved==='onsite'){ key='onsite'; statusSource='onsite'; hasSpecialWorkedDayContext='Worked during Rest Day'; }
+              else if(restResolved==='wfh'){ key='wfh'; statusSource='wfh'; hasSpecialWorkedDayContext='Worked during Rest Day (WFH)'; }
+              else { key='unverified'; }
+            }
+          }
+          else { key='restday_off'; }
+        } else if(isHolidayTag){
+          if(biologs==='NO LOGS' && !hasTimeRange){
+            counts.nwh++; key='nwh';
+          } else {
+            // Holiday work gets recorded under the LH/SH differential columns, not
+            // "Total Hours Worked" — check the actual worked hours from there.
+            var holidayWorkedHours = (lhHours+shHours)>0 ? (lhHours+shHours) : totalHoursWorked;
+            if(effectiveRequiredHours && holidayWorkedHours < effectiveRequiredHours){
+              // Tagged as a holiday and something was logged, but not enough hours
+              // to count as actually having worked it — a schedule-adjustment shortfall.
+              counts.sa_below++; key='sa_below';
+            } else {
+              // Per the reference sheet, eligibility for working a holiday now
+              // depends on clock-in method too. Still note Regular vs Special
+              // Holiday (from the LH/SH differential columns) for context.
+              var isSpecialHoliday = shHours>0 && lhHours<=0;
+              if(isSpecialHoliday) counts.nwh_worked++; else counts.rh_worked++;
+              var holidayNoteLabel = 'Worked during '+(isSpecialHoliday?'Non-working Holiday':'Holiday');
+              var holidayResolved = resolveOnsiteVsWfh(currentId, dKey, confirmedByLog, !!(dKey && empWfhDates[dKey]));
+              if(holidayResolved==='onsite'){ key='onsite'; statusSource='onsite'; hasSpecialWorkedDayContext=holidayNoteLabel; }
+              else if(holidayResolved==='wfh'){ key='wfh'; statusSource='wfh'; hasSpecialWorkedDayContext=holidayNoteLabel+' (WFH)'; }
+              else { key='unverified'; }
+            }
+          }
+        } else if(isHalfDayLeaveTag){
+          // The schedule itself is tagged "(HALF DAY LEAVE)" — confirms the leave
+          // portion, but eligibility for the worked half still depends on clock-in
+          // method, same as the Leave-sheet-derived half-day case below.
+          var tagResolved = resolveOnsiteVsWfh(currentId, dKey, confirmedByLog, !!(dKey && empWfhDates[dKey]));
+          if(tagResolved==='onsite'){ key='onsite'; statusSource='onsite'; hasHalfDayLeaveContext=true; }
+          else if(tagResolved==='wfh'){ key='wfh'; statusSource='wfh'; hasHalfDayLeaveContext=true; }
+          else { counts.halfday_unfiled++; key='halfday_unfiled'; }
+        } else if(dKey && empHalfDayLeaveDates[dKey]){
+          // An approved leave record filed for exactly 0.5 days on this date —
+          // the worked half is still Onsite or WFH depending on actual clock-in
+          // evidence; the leave just explains the other half, so it's annotated
+          // rather than replacing the real eligibility with a flat one.
+          var leaveResolved = resolveOnsiteVsWfh(currentId, dKey, confirmedByLog, !!empWfhDates[dKey]);
+          if(leaveResolved==='onsite'){ key='onsite'; statusSource='onsite'; hasHalfDayLeaveContext=true; }
+          else if(leaveResolved==='wfh'){ key='wfh'; statusSource='wfh'; hasHalfDayLeaveContext=true; }
+          else { counts.halfday_unfiled++; key='halfday_unfiled'; }
+        } else {
+          var hasWfhForDate = !!(dKey && empWfhDates[dKey]);
+          var splitResolved = resolveOnsiteVsWfh(currentId, dKey, confirmedByLog, hasWfhForDate);
+          if(splitResolved==='onsite'){
+            // Onsite is determined by the Attendance Management log — COA or
+            // auto-push confirmation for this date (or it won a same-day
+            // comparison against an overlapping WFH filing). The Detailed
+            // sheet's own Late minutes / hours only refine HOW a confirmed
+            // day is classified.
+            statusSource='onsite';
+            if(totalHoursWorked===0){
+              counts.coa_onsite++; key='onsite';
+            } else if(looksLikeHalfDay){
+              if(dKey && empLeaveDates[dKey]){ key='onsite'; hasHalfDayLeaveContext=true; }
+              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No half-day leave filed/logs detected'; }
+            } else if(lateMin>0){
+              counts.late++; key='late';
+            } else if(effectiveRequiredHours && totalHoursWorked < effectiveRequiredHours){
+              counts.sa_below++; key='sa_below';
+            } else {
+              key='onsite';
+            }
+          } else if(splitResolved==='wfh'){
+            // WFH — either no physical confirmation exists at all, or an
+            // approved WFH filing started earlier in the day than the actual
+            // clock-in (a split day: onsite for part of it, WFH for the rest).
+            statusSource='wfh';
+            if(looksLikeHalfDay){
+              if(dKey && empLeaveDates[dKey]){ key='wfh'; hasHalfDayLeaveContext=true; }
+              else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No half-day leave filed/logs detected'; }
+            } else {
+              key='wfh';
+            }
+          } else {
+            // No COA/auto-push confirmation for this date — no allowance, regardless
+            // of what hours the Detailed sheet itself shows.
+            counts.unverified++; key='unverified';
+          }
+        }
+        // Note reflects the clock-in source for this date, independent of which
+        // branch decided the status — a confirmed source always gets credit, and
+        // an unrecognized one always gets flagged, even on an otherwise-normal day.
+        // (Skipped if a branch above already set something more specific.)
+        if(note){
+          // keep the branch-specific note as-is
+        } else if(confirmedByLog){
+          note = confirmedByLog==='coa' ? 'Confirmed via COA' : 'Confirmed via biometric (auto push)';
+        } else if(dKey && empUnmapped[dKey]){
+          note = 'Clock-in method not recognized';
+        } else if(key==='unverified'){
+          note = 'No logs/leave found';
+        }
+        if(hasHalfDayLeaveContext){
+          note = note ? note+' — half day work, half day on leave' : 'Half day work, half day on leave';
+        }
+        if(hasSpecialWorkedDayContext){
+          note = note ? note+' — '+hasSpecialWorkedDayContext : hasSpecialWorkedDayContext;
+        }
+        var isLocked = !!confirmedByLog || key==='halfday_filed' || key==='halfday_unfiled' || hasHalfDayLeaveContext || !!hasSpecialWorkedDayContext;
+        log.push({date:dateStr, dateKey:dKey, key:key, note:note, locked:isLocked, source:statusSource});
+        k++;
+      }
+      if(currentId){ out[currentId] = counts; dailyLogs[currentId] = log; }
+      i = k;
+    } else {
+      i++;
+    }
+  }
+  return out;
+}
+
+document.getElementById('att-file').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      var attErr = validateAttFile(wb);
+      if(attErr){ dzError('att', attErr); return; }
+      var summarySheetName = wb.SheetNames.find(n=>/summary/i.test(n)) || wb.SheetNames[0];
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[summarySheetName], {defval:''});
+      attendanceData = {};
+      var count = 0;
+      rows.forEach(function(r){
+        var idKey = findKey(r,[/^ID No$/i,/^Employee ID$/i,/^ID$/i]);
+        if(!idKey) return;
+        var id = normId(r[idKey]);
+        if(!id) return;
+        var pKey = findKey(r,[/^Days Present/i]);
+        var aKey = findKey(r,[/^Days Absent/i]);
+        attendanceData[id] = {
+          daysPresent: parseFloat(r[pKey])||0,
+          daysAbsent: parseFloat(r[aKey])||0
+        };
+        count++;
+      });
+
+      var detailSheetName = wb.SheetNames.find(n=>/detail/i.test(n));
+      lastAttWorkbook = wb;
+      lastAttDetailSheetName = detailSheetName || null;
+      detailedData = detailSheetName ? parseDetailedSheet(wb, detailSheetName) : {};
+
+      document.getElementById('att-drop').classList.add('loaded');
+      document.getElementById('att-drop-label').textContent = 'Attendance report loaded';
+      document.getElementById('att-filename').textContent = f.name + ' · '+count+' employees'+(detailSheetName?' (+ daily detail)':'');
+      recomputeAttendance();
+      showToast('Loaded attendance data for '+count+' employees from '+f.name, 'success');
+    } catch(err){
+      dzError('att', 'Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Attendance Report, then try again.');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+});
+function removeAttFile(e){
+  e.preventDefault();
+  attendanceData = {};
+  detailedData = {};
+  document.getElementById('att-file').value = '';
+  document.getElementById('att-drop').classList.remove('loaded');
+  document.getElementById('att-drop-label').textContent = 'Drop Attendance Report';
+  document.getElementById('att-filename').textContent = '';
+  recomputeAttendance();
+}
+
+// ════════════════════════════════════════════
+// APPROVAL CENTER REPORT UPLOAD (WFH / Leave)
+// ════════════════════════════════════════════
+var approvalData = {}; // normId -> {wfhDays, leaveDays}
+var approvalDailyLog = {}; // normId -> [{dateKey, key}] for wfh/leave, one per day in range
+var scheduleAdjDates = {}; // normId -> {dateKey: true} for approved Schedule Adjustment filings
+var halfDayLeaveDates = {}; // normId -> {dateKey: true} for approved leave filed as exactly a half-day (0.5)
+function markHalfDayLeaveDates(id, fromD, toD){
+  if(!fromD || !toD) return;
+  halfDayLeaveDates[id] = halfDayLeaveDates[id] || {};
+  var cur = new Date(fromD.getFullYear(), fromD.getMonth(), fromD.getDate());
+  var end = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate());
+  var guard = 0;
+  while(cur<=end && guard<366){
+    halfDayLeaveDates[id][dateKey(cur)] = true;
+    cur.setDate(cur.getDate()+1);
+    guard++;
+  }
+}
+var wfhHoursByDate = {}; // normId -> {dateKey: hours} — from OB Time From/Time To
+function parseTimeToHours(v){
+  if(v==null || v==='') return null;
+  if(v instanceof Date) return v.getHours() + v.getMinutes()/60;
+  if(typeof v==='number') return v*24; // Excel time fraction (0-1)
+  var s = String(v).trim();
+  var m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+  if(!m) return null;
+  var h = parseInt(m[1],10), min = parseInt(m[2],10);
+  var ap = m[4];
+  if(ap){
+    ap = ap.toUpperCase();
+    if(ap==='PM' && h!==12) h += 12;
+    if(ap==='AM' && h===12) h = 0;
+  }
+  return h + min/60;
+}
+function pushDateRangeToLog(id, fromD, toD, key){
+  if(!fromD || !toD) return;
+  approvalDailyLog[id] = approvalDailyLog[id] || [];
+  var cur = new Date(fromD.getFullYear(), fromD.getMonth(), fromD.getDate());
+  var end = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate());
+  var guard = 0;
+  while(cur<=end && guard<366){
+    approvalDailyLog[id].push({dateKey: dateKey(cur), key: key});
+    cur.setDate(cur.getDate()+1);
+    guard++;
+  }
+}
+function markWfhHours(id, fromD, toD, hours){
+  if(!fromD || !toD || hours==null) return;
+  wfhHoursByDate[id] = wfhHoursByDate[id] || {};
+  var cur = new Date(fromD.getFullYear(), fromD.getMonth(), fromD.getDate());
+  var end = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate());
+  var guard = 0;
+  while(cur<=end && guard<366){
+    wfhHoursByDate[id][dateKey(cur)] = hours;
+    cur.setDate(cur.getDate()+1);
+    guard++;
+  }
+}
+var wfhStartTimeByDate = {}; // normId(empId) -> {dateKey: hourOfDay} — the OB's Time From, for split-day comparison
+function markWfhStartTime(id, fromD, toD, startHour){
+  if(!fromD || !toD || startHour==null) return;
+  wfhStartTimeByDate[id] = wfhStartTimeByDate[id] || {};
+  var cur = new Date(fromD.getFullYear(), fromD.getMonth(), fromD.getDate());
+  var end = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate());
+  var guard = 0;
+  while(cur<=end && guard<366){
+    wfhStartTimeByDate[id][dateKey(cur)] = startHour;
+    cur.setDate(cur.getDate()+1);
+    guard++;
+  }
+}
+function markScheduleAdjDates(id, fromD, toD){
+  if(!fromD || !toD) return;
+  scheduleAdjDates[id] = scheduleAdjDates[id] || {};
+  var cur = new Date(fromD.getFullYear(), fromD.getMonth(), fromD.getDate());
+  var end = new Date(toD.getFullYear(), toD.getMonth(), toD.getDate());
+  var guard = 0;
+  while(cur<=end && guard<366){
+    scheduleAdjDates[id][dateKey(cur)] = true;
+    cur.setDate(cur.getDate()+1);
+    guard++;
+  }
+}
+document.getElementById('appr-file').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      var apprErr = validateApprFile(wb);
+      if(apprErr){ dzError('appr', apprErr); return; }
+      approvalData = {};
+      approvalDailyLog = {};
+      wfhHoursByDate = {};
+      wfhStartTimeByDate = {};
+      halfDayLeaveDates = {};
+
+      // Official Business sheet → WFH days (any approved OB entry counts, regardless of stated reason)
+      var obSheetName = wb.SheetNames.find(n=>/official business/i.test(n));
+      if(obSheetName){
+        var obRows = XLSX.utils.sheet_to_json(wb.Sheets[obSheetName], {defval:''});
+        obRows.forEach(function(r){
+          var idKey = findKey(r,[/^Employee ID$/i]);
+          var statusKey = findKey(r,[/^Status$/i]);
+          var fromKey = findKey(r,[/^Date From$/i]);
+          var toKey = findKey(r,[/^Date To$/i]);
+          var timeFromKey = findKey(r,[/^Time From$/i]);
+          var timeToKey = findKey(r,[/^Time To$/i]);
+          if(!idKey) return;
+          var id = normId(r[idKey]);
+          if(!id) return;
+          var status = String(r[statusKey]||'').toLowerCase();
+          if(status!=='approved') return;
+          var fromD = excelDateToJS(r[fromKey]), toD = excelDateToJS(r[toKey]);
+          var d = daysBetweenInclusive(fromD, toD) || 1;
+          approvalData[id] = approvalData[id] || {wfhDays:0, leaveDays:0};
+          approvalData[id].wfhDays += d;
+          pushDateRangeToLog(id, fromD, toD, 'wfh');
+          // Track the approved OB's actual duration so a too-short WFH filing
+          // doesn't still grant full allowance just for being approved.
+          var tFrom = timeFromKey ? parseTimeToHours(r[timeFromKey]) : null;
+          var tTo = timeToKey ? parseTimeToHours(r[timeToKey]) : null;
+          if(tFrom!=null && tTo!=null){
+            var obHours = tTo - tFrom;
+            if(obHours < 0) obHours += 24; // guard against odd wraparound
+            markWfhHours(id, fromD, toD, obHours);
+          }
+          if(tFrom!=null){
+            markWfhStartTime(id, fromD, toD, tFrom);
+          }
+        });
+      }
+
+      // Leave sheet → leave days (approved, With Pay + Without Pay)
+      var leaveSheetName = wb.SheetNames.find(n=>/^leave$/i.test(n));
+      if(leaveSheetName){
+        var leaveRows = XLSX.utils.sheet_to_json(wb.Sheets[leaveSheetName], {defval:''});
+        leaveRows.forEach(function(r){
+          var idKey = findKey(r,[/^Employee ID$/i]);
+          var statusKey = findKey(r,[/^Leave Status$/i]);
+          var wpKey = findKey(r,[/With Pay Number Of Days/i]);
+          var wopKey = findKey(r,[/Without Pay Number Of Days/i]);
+          var fromKey = findKey(r,[/^Date From$/i]);
+          var toKey = findKey(r,[/^Date To$/i]);
+          if(!idKey) return;
+          var id = normId(r[idKey]);
+          if(!id) return;
+          var status = String(r[statusKey]||'').toLowerCase();
+          if(status!=='approved') return;
+          var d = (parseFloat(r[wpKey])||0) + (parseFloat(r[wopKey])||0);
+          approvalData[id] = approvalData[id] || {wfhDays:0, leaveDays:0};
+          approvalData[id].leaveDays += d;
+          var fromD = excelDateToJS(r[fromKey]), toD = excelDateToJS(r[toKey]);
+          // Whole-day leave overrides other statuses as "On Leave"; a leave
+          // amount under 1 (e.g. 0.5) overrides as "On Half-day Leave" instead —
+          // no need to show which leave type, just the day-fraction.
+          pushDateRangeToLog(id, fromD, toD, (d>0 && d<1) ? 'leave_half' : 'leave');
+          // A leave amount of exactly 0.5 per day is an approved half-day leave —
+          // mark these dates directly rather than relying on hours happening to
+          // coincidentally match the half-day threshold.
+          if(d>0 && d<1){
+            markHalfDayLeaveDates(id, fromD, toD);
+          }
+        });
+      }
+
+      // Schedule Adjustment sheet → dates where an approved SA is on file.
+      // No hours are given here — this just flags the date so the Detailed
+      // sheet's actual worked hours get checked against required hours for it.
+      scheduleAdjDates = {};
+      var saSheetName = wb.SheetNames.find(n=>/schedule adjustment/i.test(n));
+      if(saSheetName){
+        var saRows = XLSX.utils.sheet_to_json(wb.Sheets[saSheetName], {defval:''});
+        saRows.forEach(function(r){
+          var idKey = findKey(r,[/^Employee ID$/i]);
+          var statusKey = findKey(r,[/^Status$/i]);
+          var fromKey = findKey(r,[/^Date From$/i]);
+          var toKey = findKey(r,[/^Date To$/i]);
+          if(!idKey) return;
+          var id = normId(r[idKey]);
+          if(!id) return;
+          var status = String(r[statusKey]||'').toLowerCase();
+          if(status!=='approved') return;
+          markScheduleAdjDates(id, excelDateToJS(r[fromKey]), excelDateToJS(r[toKey]));
+        });
+      }
+
+      document.getElementById('appr-drop').classList.add('loaded');
+      document.getElementById('appr-drop-label').textContent = 'Approval Center report loaded';
+      document.getElementById('appr-filename').textContent = f.name + ' · '+Object.keys(approvalData).length+' employees w/ WFH or leave';
+      // Re-parse the attendance detail sheet now that Leave/Schedule Adjustment
+      // dates are known (needed for Half Day filed/unfiled and SA-shortfall checks).
+      if(lastAttWorkbook && lastAttDetailSheetName){
+        detailedData = parseDetailedSheet(lastAttWorkbook, lastAttDetailSheetName);
+      }
+      recomputeAttendance();
+      showToast('Loaded WFH/leave/schedule adjustment approvals from '+f.name, 'success');
+    } catch(err){
+      dzError('appr', 'Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Approval Center, then try again.');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+});
+function removeApprFile(e){
+  e.preventDefault();
+  approvalData = {};
+  document.getElementById('appr-file').value = '';
+  document.getElementById('appr-drop').classList.remove('loaded');
+  document.getElementById('appr-drop-label').textContent = 'Drop Approval Center Report';
+  document.getElementById('appr-filename').textContent = '';
+  recomputeAttendance();
+}
+
+// ════════════════════════════════════════════
+// ADJUSTMENT TEMPLATE UPLOAD (used only at export time)
+// ════════════════════════════════════════════
+var adjFile = null;
+document.getElementById('adj-file').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  readWb(f).then(function(wb){
+    var adjErr = validateAdjFile(wb);
+    if(adjErr){ dzError('adj', adjErr); return; }
+    adjFile = f;
+    document.getElementById('adj-drop').classList.add('loaded');
+    document.getElementById('adj-drop-label').textContent = 'Adjustment template loaded';
+    document.getElementById('adj-filename').textContent = f.name;
+    showToast('Loaded '+f.name+' — will fill this template on export.', 'success');
+  }).catch(function(){
+    dzError('adj', 'Heads up! Could not read this file. Download the template from Sprout Payroll → Payroll → Upload Adjustment → Download Excel Template, then try again.');
+  });
+});
+function removeAdjFile(e){
+  e.preventDefault();
+  adjFile = null;
+  document.getElementById('adj-file').value = '';
+  document.getElementById('adj-drop').classList.remove('loaded');
+  document.getElementById('adj-drop-label').textContent = 'Drop Adjustment Template';
+  document.getElementById('adj-filename').textContent = '';
+}
+
+// ════════════════════════════════════════════
+// ATTENDANCE LOGS UPLOAD (Biometric / COA) — confirms Onsite on days
+// the Detailed sheet shows as "NO LOGS"
+// ════════════════════════════════════════════
+var onsiteLogDates = {};   // normId(empId) -> {dateKey: 'coa'|'biometric'}
+var unmappedLogDates = {}; // normId(empId) -> {dateKey: rawNotes} — for surfacing per-day in the breakdown
+var lastCoaWorkbook = null;
+var autoPushTimeByDate = {}; // normId(empId) -> {dateKey: hourOfDay} — only for "auto push" entries, which carry a real time
+
+var lastUnmappedClockInMethods = []; // filled by parseCoaLog for the caller to warn about
+
+function parseCoaLog(wb){
+  var out = {};
+  var unmapped = {};
+  unmappedLogDates = {};
+  autoPushTimeByDate = {};
+  var sheetName = wb.SheetNames[0];
+  var rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {defval:''});
+  rows.forEach(function(r){
+    var bioId = String(r['BiometricID']||'').trim();
+    if(!bioId) return;
+    var empId = biometricToEmpId[bioId];
+    if(!empId) return; // unmatched biometric ID — no Employee List entry with this Biometric ID
+
+    var rawNotes = String(r['Notes']||'').trim();
+    var notes = rawNotes.toLowerCase();
+
+    // Only these two count as valid Onsite confirmation. Every other clock-in
+    // method — Bundy, Manually added, Batch add, Excel upload, or anything else —
+    // flags as "not yet mapped out" rather than silently confirming or excluding.
+    var isCoa = notes.indexOf('certificateofattendance')>-1;
+    var isAutoPush = notes.indexOf('auto push')>-1;
+
+    if(!isCoa && !isAutoPush){
+      if(rawNotes) unmapped[rawNotes] = true;
+      var ud = excelDateToJS(r['LogTime']);
+      if(ud){
+        var uKey = dateKey(ud);
+        unmappedLogDates[empId] = unmappedLogDates[empId] || {};
+        unmappedLogDates[empId][uKey] = rawNotes;
+      }
+      return;
+    }
+
+    var logTime = r['LogTime'];
+    var d = excelDateToJS(logTime);
+    if(!d) return;
+    var key = dateKey(d);
+    out[empId] = out[empId] || {};
+    // Track which method confirmed it — COA takes label priority if a date somehow has both.
+    if(!out[empId][key] || isCoa) out[empId][key] = isCoa ? 'coa' : 'biometric';
+    // Auto push carries a real clock-in time (unlike COA, which is date-only) —
+    // needed to compare against an approved WFH's Time From when someone splits
+    // a day between Onsite and WFH.
+    if(isAutoPush){
+      var punchHour = d.getHours() + d.getMinutes()/60;
+      autoPushTimeByDate[empId] = autoPushTimeByDate[empId] || {};
+      if(autoPushTimeByDate[empId][key]===undefined || punchHour < autoPushTimeByDate[empId][key]){
+        autoPushTimeByDate[empId][key] = punchHour; // keep the earliest punch of the day
+      }
+    }
+  });
+  lastUnmappedClockInMethods = Object.keys(unmapped);
+  return out;
+}
+
+document.getElementById('coa-file').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+      var coaErr = validateCoaFile(wb);
+      if(coaErr){ dzError('coa', coaErr); return; }
+      lastCoaWorkbook = wb;
+      onsiteLogDates = parseCoaLog(wb);
+      // Attendance report may have loaded first — re-run its detail parse so the
+      // COA/biometric confirmation gets applied to already-loaded days.
+      if(lastAttWorkbook && lastAttDetailSheetName){
+        detailedData = parseDetailedSheet(lastAttWorkbook, lastAttDetailSheetName);
+      }
+      document.getElementById('coa-drop').classList.add('loaded');
+      document.getElementById('coa-drop-label').textContent = 'Attendance logs loaded';
+      document.getElementById('coa-filename').textContent = f.name + ' · '+Object.keys(onsiteLogDates).length+' employees matched';
+      recomputeAttendance();
+      showToast('Loaded attendance management data from '+f.name+'. Matched '+Object.keys(onsiteLogDates).length+' employees by Biometric ID.', 'success');
+      if(lastUnmappedClockInMethods.length>0){
+        showToast('Clock-in method not recognized — not counted as Onsite confirmation.', 'warning', 9000);
+      }
+    } catch(err){
+      dzError('coa', 'Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Attendance Management, then try again.');
+    }
+  };
+  reader.readAsArrayBuffer(f);
+});
+function removeCoaFile(e){
+  e.preventDefault();
+  onsiteLogDates = {};
+  lastCoaWorkbook = null;
+  document.getElementById('coa-file').value = '';
+  document.getElementById('coa-drop').classList.remove('loaded');
+  document.getElementById('coa-drop-label').textContent = 'Drop Attendance Management';
+  document.getElementById('coa-filename').textContent = '';
+  if(lastAttWorkbook && lastAttDetailSheetName){
+    detailedData = parseDetailedSheet(lastAttWorkbook, lastAttDetailSheetName);
+  }
+  recomputeAttendance();
+}
+
+// ════════════════════════════════════════════
+// MERGE: recompute all auto-derivable statuses from uploaded reports
+// (halfday_unfiled has no report source — always manual/0)
+// ════════════════════════════════════════════
+function recomputeAttendance(){
+  employees.forEach(function(emp){
+    emp.att = emp.att || {};
+    var id = normId(emp.id);
+    var att = attendanceData[id];
+    var appr = approvalData[id];
+    var det = detailedData[id];
+    var wfh = appr ? appr.wfhDays : 0;
+    var leave = appr ? appr.leaveDays : 0;
+    var daysPresent = att ? att.daysPresent : 0;
+    var daysAbsentRaw = att ? att.daysAbsent : 0;
+    var late = det ? det.late : 0;
+    var halfdayFiled = det ? det.halfday_filed : 0;
+    var halfdayUnfiled = det ? det.halfday_unfiled : 0;
+    var nwh = det ? det.nwh : 0;
+    var rd = det ? det.rd : 0;
+    var rhWorked = det ? det.rh_worked : 0;
+    var nwhWorked = det ? det.nwh_worked : 0;
+    var saBelow = det ? det.sa_below : 0;
+    var coaOnsite = det ? det.coa_onsite : 0;
+    var unverified = det ? det.unverified : 0;
+
+    // A day confirmed Onsite via COA/auto-push is authoritative — if it also falls
+    // within an approved WFH or Leave date range, don't count it twice (once as
+    // Onsite, once as WFH/Leave). Net the overlap out of the WFH/Leave day totals.
+    // If a date somehow has both an approved OB (WFH) and an approved Leave, WFH wins.
+    var resolvedApproval = {};
+    (approvalDailyLog[id]||[]).forEach(function(a){
+      if(!resolvedApproval[a.dateKey] || a.key==='wfh') resolvedApproval[a.dateKey] = a.key;
+    });
+    var lockedDates = {};
+    (dailyLogs[id]||[]).forEach(function(d){ if(d.locked && d.dateKey) lockedDates[d.dateKey] = true; });
+    var wfhOverlap = 0, leaveOverlap = 0;
+    Object.keys(resolvedApproval).forEach(function(dk){
+      if(!lockedDates[dk]) return;
+      if(resolvedApproval[dk]==='wfh') wfhOverlap++;
+      else if(resolvedApproval[dk]==='leave' || resolvedApproval[dk]==='leave_half') leaveOverlap++;
+    });
+    wfh = Math.max(0, wfh - wfhOverlap);
+    leave = Math.max(0, leave - leaveOverlap);
+
+    // Days Present includes WFH, Late, Half Day, Working RD, holiday-worked,
+    // below-required-hours, and unverified (no COA/auto-push) days as long as
+    // *something* was logged — pull those into their own buckets.
+    // Days confirmed onsite via biometric/COA log (despite "NO LOGS" in the Detailed sheet) get
+    // added back in, and pulled out of Absent since the summary likely counted them as absent.
+    var onsite = Math.max(0, daysPresent - wfh - late - halfdayFiled - halfdayUnfiled - rd - rhWorked - nwhWorked - saBelow - unverified) + coaOnsite;
+    // Days Absent may double-count days already covered by approved leave or a confirmed onsite log; net it out.
+    var absent = Math.max(0, daysAbsentRaw - leave - coaOnsite);
+    emp.att.onsite = onsite;
+    emp.att.wfh = wfh;
+    emp.att.leave = leave;
+    emp.att.absent = absent;
+    emp.att.late = late;
+    emp.att.nwh = nwh;
+    emp.att.rd = rd;
+    emp.att.rh_worked = rhWorked;
+    emp.att.nwh_worked = nwhWorked;
+    emp.att.halfday_filed = halfdayFiled;
+    emp.att.halfday_unfiled = halfdayUnfiled;
+    emp.att.sa_below = saBelow;
+    emp.att.unverified = unverified;
+    emp.att.halfday = emp.att.halfday||0; // legacy catch-all column — manual only
+
+    // Merge Detailed-sheet daily log with Approval Center WFH/Leave date ranges.
+    // Approval entries override whatever the Detailed sheet said for that date —
+    // UNLESS that date is confirmed Onsite via COA/auto-push, which always wins
+    // (physical presence proof beats a WFH/Leave filing). A locked Half Day
+    // (computed from hours, not physical confirmation) can still be overridden
+    // by an approved WFH — an OB filing explains why the hours looked partial,
+    // and gets WFH-level eligibility (Food only) since the worked half was done
+    // from home. The full-day WFH hours-vs-required check doesn't apply here —
+    // this is already a recognized half-day scenario, not a claim to a full day.
+    // A WFH filing that doesn't meet required hours (minus break) doesn't get a
+    // pass just for being approved — it becomes a schedule-adjustment shortfall.
+    var empEffReq = employeeRequiredHours[id] ? (employeeRequiredHours[id] - 1) : null;
+    function resolveApprovalKey(dk, k){
+      if(k==='wfh'){
+        var h = (wfhHoursByDate[id]||{})[dk];
+        if(h!=null && empEffReq && h < empEffReq) return {key:'sa_below', note:''};
+      }
+      if(k==='leave_half'){
+        // A half-day leave was filed, but the Detailed sheet showed no matching
+        // half-day-hours pattern to route it through the usual half-day-leave
+        // check. If there's still a genuine COA/auto-push confirmation for this
+        // exact date, the worked half is Onsite — don't default to no allowance
+        // just because the hours-based detection didn't catch it.
+        var confirmed = (onsiteLogDates[id]||{})[dk];
+        if(confirmed) return {key:'onsite', note:'Half day work, half day on leave'};
+      }
+      return {key:k, note:''};
+    }
+    var baseLog = (dailyLogs[id]||[]).map(function(d){ return {date:d.date, dateKey:d.dateKey, key:d.key, note:d.note, locked:d.locked, source:d.source}; });
+    var byDate = {};
+    baseLog.forEach(function(d){ if(d.dateKey) byDate[d.dateKey] = d; });
+    Object.keys(resolvedApproval).forEach(function(dk){
+      var rawK = resolvedApproval[dk];
+      if(byDate[dk]){
+        var entry = byDate[dk];
+        if(entry.locked){
+          var isHalfDayLock = entry.key==='halfday_filed' || entry.key==='halfday_unfiled';
+          if(rawK==='wfh' && isHalfDayLock){ entry.key='wfh'; entry.note=''; }
+          return;
+        }
+        var resolved = resolveApprovalKey(dk, rawK);
+        entry.key = resolved.key; entry.note = resolved.note;
+      }
+      else { var resolved2 = resolveApprovalKey(dk, rawK); var nd = {date:dk, dateKey:dk, key:resolved2.key, note:resolved2.note}; baseLog.push(nd); byDate[dk]=nd; }
+    });
+    baseLog.sort(function(x,y){ return (x.dateKey||'') < (y.dateKey||'') ? -1 : 1; });
+    emp.dailyLog = baseLog;
+  });
+}
+
+// ════════════════════════════════════════════
+// COMPUTE
+// ════════════════════════════════════════════
+function computeAllowances(){
+  if(employees.length===0){ showToast('Upload an employee list first.', 'warning'); return; }
+  results = employees.map(function(emp){
+    var tierRow = DEFAULT_TIERS.find(function(t){return t[0]===emp.tier;});
+    var rate = tierRow ? {food:tierRow[1],transpo:tierRow[2],hazard:tierRow[3]} : {food:0,transpo:0,hazard:0};
+    // Sum directly from the same per-day merged log the breakdown popup shows,
+    // instead of separate aggregate day-counts — guarantees the total always
+    // matches what you'd get by manually adding up the popup's rows, even when
+    // the WFH/Leave merge overrides a day's original classification.
+    var log = emp.dailyLog || [];
+    var food=0, transpo=0, hazard=0;
+    log.forEach(function(d){
+      var e = eligibility[d.key] || {food:false,transpo:false,hazard:false};
+      if(e.food) food += rate.food;
+      if(e.transpo) transpo += rate.transpo;
+      if(e.hazard) hazard += rate.hazard;
+    });
+    return {id:emp.id, name:emp.name, tier:emp.tier||'—', food:food, transpo:transpo, hazard:hazard, total:food+transpo+hazard};
+  });
+  renderResults();
+  showToast('Computed allowances for '+results.length+' employees.', 'success');
+}
+
+function renderResults(){
+  var wrap = document.getElementById('results-wrap');
+  var q = (document.getElementById('result-search')?.value||'').toLowerCase();
+  var hideZero = document.getElementById('hide-zero')?.checked;
+  var allowF = document.getElementById('allow-filter')?.value;
+  var tierCat = document.getElementById('tier-category-filter')?.value;
+  var rows = results
+    .filter(function(r){ return !q || (r.name+r.id).toLowerCase().indexOf(q)>-1; })
+    .filter(function(r){ return !hideZero || r.total>0; })
+    .filter(function(r){ return allowF!=='has_allow' || r.total>0; })
+    .filter(function(r){ return allowF!=='no_allow' || r.total===0; })
+    .filter(function(r){ return !tierCat || (r.tier||'').toUpperCase().indexOf(tierCat)===0; });
+
+  document.getElementById('s-emp').textContent = results.length;
+  document.getElementById('s-food').textContent = '₱'+results.reduce((s,r)=>s+r.food,0).toLocaleString();
+  document.getElementById('s-transpo').textContent = '₱'+results.reduce((s,r)=>s+r.transpo,0).toLocaleString();
+  document.getElementById('s-hazard').textContent = '₱'+results.reduce((s,r)=>s+r.hazard,0).toLocaleString();
+  document.getElementById('s-total').textContent = '₱'+results.reduce((s,r)=>s+r.total,0).toLocaleString();
+
+  if(results.length===0){
+    wrap.innerHTML = '<div class="state-box"><div class="state-icon">💰</div><div class="state-title">No results yet</div><div class="state-sub">Upload employee list, assign tiers, enter attendance counts, then Generate Report.</div></div>';
+    return;
+  }
+  if(rows.length===0){
+    wrap.innerHTML = '<div class="state-box"><div class="state-icon">🔍</div><div class="state-title">No matches</div><div class="state-sub">Try a different filter.</div></div>';
+    return;
+  }
+
+  var html = '<table><thead><tr><th>Employee</th><th>Job Level</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th><th class="num">Total</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    html += '<tr class="clickable-row" style="cursor:pointer" data-emp-id="'+escapeHtml(r.id)+'" title="Click for daily breakdown">' +
+      '<td><div class="emp-name">'+escapeHtml(r.name||'(no name)')+'</div><div class="emp-id">'+escapeHtml(r.id)+'</div></td>' +
+      '<td><span class="tier-badge">'+escapeHtml(r.tier)+'</span></td>' +
+      '<td class="num allow-val '+(r.food===0?'allow-zero':'')+'">₱'+r.food.toLocaleString()+'</td>' +
+      '<td class="num allow-val '+(r.transpo===0?'allow-zero':'')+'">₱'+r.transpo.toLocaleString()+'</td>' +
+      '<td class="num allow-val '+(r.hazard===0?'allow-zero':'')+'">₱'+r.hazard.toLocaleString()+'</td>' +
+      '<td class="num allow-val">₱'+r.total.toLocaleString()+'</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  if(!wrap.dataset.clickDelegated){
+    wrap.addEventListener('click', function(e){
+      var row = e.target.closest('[data-emp-id]');
+      if(row) openDayBreakdown(row.dataset.empId);
+    });
+    wrap.dataset.clickDelegated = 'true';
+  }
+}
+
+// ════════════════════════════════════════════
+// DAY-LEVEL BREAKDOWN MODAL
+// ════════════════════════════════════════════
+function openDayBreakdown(empId){
+  var r = results.find(function(x){ return String(x.id)===String(empId); });
+  var emp = employees.find(function(x){ return String(x.id)===String(empId); });
+  if(!r || !emp){ showToast('Could not find that employee.', 'error'); return; }
+
+  var tierRow = DEFAULT_TIERS.find(function(t){ return t[0]===emp.tier; });
+  var rate = tierRow ? {food:tierRow[1],transpo:tierRow[2],hazard:tierRow[3]} : {food:0,transpo:0,hazard:0};
+  var log = (emp.dailyLog||[]).slice().sort(function(a,b){ return (a.dateKey||'')<(b.dateKey||'') ? -1 : 1; });
+
+  document.getElementById('day-modal-title').textContent = emp.name || emp.id;
+  document.getElementById('day-modal-sub').textContent = emp.id + ' · ' + (emp.tier||'No Job Level matched');
+
+  // Quick-reference: what this tier actually earns if Onsite vs WFH, per the
+  // current Eligibility Matrix — so it's clear at a glance without cross-checking.
+  function cardHtml(label, elig){
+    var lineDefs = [
+      {name:'Food', on:!!elig.food, amt:rate.food},
+      {name:'Transpo', on:!!elig.transpo, amt:rate.transpo},
+      {name:'Hazard', on:!!elig.hazard, amt:rate.hazard}
+    ];
+    var linesHtml = lineDefs.map(function(l){
+      return '<div class="ti-line '+(l.on?'yes':'no')+'">' +
+        '<span class="ti-check">'+(l.on?'✓':'✕')+'</span>' +
+        '<span>'+l.name+'</span>' +
+        (l.on ? '<span class="ti-amt">₱'+l.amt.toLocaleString()+'</span>' : '') +
+        '</div>';
+    }).join('');
+    return '<div class="ti-card"><div class="ti-card-title">'+label+'</div>'+linesHtml+'</div>';
+  }
+  document.getElementById('day-modal-tierinfo').innerHTML =
+    '<div class="ti-joblevel"><span class="ti-label">Job Level</span><span class="ti-value">'+escapeHtml(emp.tier||'No Job Level matched')+'</span></div>' +
+    '<div class="ti-cards">' +
+      cardHtml('Onsite', eligibility.onsite||{}) +
+      cardHtml('WFH', eligibility.wfh||{}) +
+    '</div>';
+
+  if(log.length===0){
+    document.getElementById('day-modal-body').innerHTML = '<div class="state-box" style="padding:30px"><div class="state-sub">No day-level detail available — this employee wasn\'t found in the Attendance Report\'s Detailed sheet.</div></div>';
+    document.getElementById('day-modal-footer').innerHTML = '';
+    document.getElementById('day-modal-backdrop').classList.add('show');
+    return;
+  }
+
+  var totalFood=0, totalTranspo=0, totalHazard=0;
+  var rowsHtml = log.map(function(d){
+    var elig = eligibility[d.key] || {food:false,transpo:false,hazard:false};
+    var food = elig.food ? rate.food : 0;
+    var transpo = elig.transpo ? rate.transpo : 0;
+    var hazard = elig.hazard ? rate.hazard : 0;
+    totalFood += food; totalTranspo += transpo; totalHazard += hazard;
+    var paid = (food+transpo+hazard)>0 || d.key==='leave' || d.key==='leave_half' || d.key==='restday_off'; // Leave (whole or half-day) and an unworked Rest Day are normal, expected outcomes — not problems
+    var label = displayLabel(d);
+    return '<tr>' +
+      '<td>'+escapeHtml(d.date||d.dateKey||'—')+'</td>' +
+      '<td><span class="day-status-badge '+(paid?'paid':'')+'">'+escapeHtml(label)+'</span>'+(d.note?'<div style="font-size:8px;color:var(--muted);margin-top:1px">'+escapeHtml(d.note)+'</div>':'')+'</td>' +
+      '<td class="num">'+(food>0?'₱'+food.toLocaleString():'—')+'</td>' +
+      '<td class="num">'+(transpo>0?'₱'+transpo.toLocaleString():'—')+'</td>' +
+      '<td class="num">'+(hazard>0?'₱'+hazard.toLocaleString():'—')+'</td>' +
+      '</tr>';
+  }).join('');
+
+  document.getElementById('day-modal-body').innerHTML =
+    '<table class="day-table"><thead><tr><th>Date</th><th>Status</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>';
+  document.getElementById('day-modal-footer').innerHTML =
+    'Food: <b>₱'+totalFood.toLocaleString()+'</b> · Transpo: <b>₱'+totalTranspo.toLocaleString()+'</b> · Hazard: <b>₱'+totalHazard.toLocaleString()+'</b> · Total: <b>₱'+(totalFood+totalTranspo+totalHazard).toLocaleString()+'</b>';
+  document.getElementById('day-modal-backdrop').classList.add('show');
+}
+function closeDayModal(){
+  document.getElementById('day-modal-backdrop').classList.remove('show');
+}
+
+// ════════════════════════════════════════════
+// EXPORTS
+// ════════════════════════════════════════════
+function exportSummary(){
+  if(results.length===0){ showToast('Nothing to export yet.', 'warning'); return; }
+  var hideZero = document.getElementById('hide-zero')?.checked;
+  var filteredResults = results.filter(r=>!hideZero || r.total>0);
+  var rows = filteredResults.map(function(r){
+    return {'Employee ID':r.id,'Employee Name':r.name,'Job Level':r.tier,'Food':r.food,'Transportation':r.transpo,'Hazard Pay':r.hazard,'Total':r.total};
+  });
+  var ws = XLSX.utils.json_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Daily Allowance Summary');
+
+  // Second tab: per-day breakdown for each employee, same logic as the modal.
+  var filteredIds = {};
+  filteredResults.forEach(function(r){ filteredIds[String(r.id)] = true; });
+  var dailyRows = [];
+  employees
+    .filter(function(emp){ return filteredIds[String(emp.id)]; })
+    .forEach(function(emp){
+      var tierRow = DEFAULT_TIERS.find(function(t){ return t[0]===emp.tier; });
+      var rate = tierRow ? {food:tierRow[1],transpo:tierRow[2],hazard:tierRow[3]} : {food:0,transpo:0,hazard:0};
+      var log = (emp.dailyLog||[]).slice().sort(function(a,b){ return (a.dateKey||'')<(b.dateKey||'') ? -1 : 1; });
+      log.forEach(function(d){
+        var elig = eligibility[d.key] || {food:false,transpo:false,hazard:false};
+        var food = elig.food ? rate.food : 0;
+        var transpo = elig.transpo ? rate.transpo : 0;
+        var hazard = elig.hazard ? rate.hazard : 0;
+        dailyRows.push({
+          'Employee ID': emp.id,
+          'Employee Name': emp.name,
+          'Job Level': emp.tier || '—',
+          'Date': d.date || d.dateKey || '',
+          'Status': displayLabel(d),
+          'Note': d.note || '',
+          'Food': food,
+          'Transportation': transpo,
+          'Hazard Pay': hazard,
+          'Daily Total': food+transpo+hazard
+        });
+      });
+    });
+  var ws2 = XLSX.utils.json_to_sheet(dailyRows);
+  XLSX.utils.book_append_sheet(wb, ws2, 'Daily Breakdown');
+
+  XLSX.writeFile(wb, 'Daily_Allowance_Summary_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  logExport('Excel Summary', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+}
+
+// ─── Adjustment Modal ───
+function openAdjModal(){
+  if(results.length===0){ showToast('Nothing to export yet.', 'warning'); return; }
+  try{
+    var saved = JSON.parse(localStorage.getItem('daily-adj-modal-config')||'{}');
+    if(saved.adjType) document.getElementById('m-adj-type').value = saved.adjType;
+    if(saved.adjName) document.getElementById('m-adj-name').value = saved.adjName;
+    if(saved.adjCode) document.getElementById('m-adj-code').value = saved.adjCode;
+    if(saved.beforeTax) document.getElementById('m-adj-before-tax').value = saved.beforeTax;
+    if(saved.taxable) document.getElementById('m-adj-taxable').value = saved.taxable;
+  } catch(e){}
+  updateAdjModalPreview();
+  document.getElementById('adj-modal').classList.add('open');
+}
+function closeAdjModal(){
+  document.getElementById('adj-modal').classList.remove('open');
+}
+function getAdjModalFields(){
+  var fields = {
+    adjType: document.getElementById('m-adj-type').value,
+    adjName: document.getElementById('m-adj-name').value,
+    adjCode: document.getElementById('m-adj-code').value,
+    beforeTax: document.getElementById('m-adj-before-tax').value,
+    taxable: document.getElementById('m-adj-taxable').value
+  };
+  try{ localStorage.setItem('daily-adj-modal-config', JSON.stringify(fields)); }catch(e){}
+  return fields;
+}
+function updateAdjModalPreview(){
+  var f = getAdjModalFields();
+  document.getElementById('adj-modal-preview').innerHTML =
+    'Each row will be written as: <b>'+escapeHtml(f.adjType)+'</b> — <b>'+escapeHtml(f.adjName)+'</b> (code <b>'+escapeHtml(f.adjCode)+'</b>), '+
+    'before-tax: <b>'+escapeHtml(f.beforeTax)+'</b>, taxable: <b>'+escapeHtml(f.taxable)+'</b>.';
+}
+document.getElementById('adj-modal').addEventListener('input', updateAdjModalPreview);
+function confirmAdjExport(){
+  closeAdjModal();
+  if(adjFile){ exportAdjustmentFromTemplate(); return; }
+  var mf = getAdjModalFields();
+  var hideZero = document.getElementById('hide-zero')?.checked;
+  var rows = results.filter(r=>!hideZero || r.total>0);
+  var aoa = [
+    ['STATUS','Employee ID','Employee Name','Adjustment Type','Adjustment Name','Adjustment Code','Adjustment Amount','Remarks','Apply Before Tax','Is Taxable'],
+    ['SAMPLE DATA','E0000001','Juan Dela Cruz',mf.adjType,mf.adjName,mf.adjCode,1000,mf.adjName,mf.beforeTax,mf.taxable]
+  ];
+  rows.forEach(function(r){
+    aoa.push(['', r.id, r.name, mf.adjType, mf.adjName, mf.adjCode, r.total, mf.adjName+' ('+r.tier+')', mf.beforeTax, mf.taxable]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(aoa);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ProcessPayrollImportAdjustment');
+  XLSX.writeFile(wb, 'Daily_Allowance_Adjustment_Template_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+}
+
+// Fill an uploaded Payrollpie template in-place, same pattern as V1/V2:
+// employees already listed in the template get their amount filled in;
+// those with allowance go on top, those without go below (or are dropped if hide-zero is checked).
+function exportAdjustmentFromTemplate(){
+  var hideZero = document.getElementById('hide-zero')?.checked;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellStyles:true});
+      var ws = wb.Sheets['ProcessPayrollImportAdjustment'];
+      if(!ws){ showToast('Sheet "ProcessPayrollImportAdjustment" not found in that template.', 'error'); return; }
+
+      var DATA_FONT = {name:'Calibri', sz:11};
+      var range = XLSX.utils.decode_range(ws['!ref']);
+
+      var templateRows = [];
+      for(var r=2;r<=range.e.r;r++){
+        var rowData = {};
+        for(var c=0;c<=range.e.c;c++){
+          var addr = XLSX.utils.encode_cell({r:r,c:c});
+          if(ws[addr]) rowData[c] = Object.assign({}, ws[addr]);
+        }
+        var statusCell = ws[XLSX.utils.encode_cell({r:r,c:0})];
+        var isSample = statusCell && String(statusCell.v||'').indexOf('SAMPLE')>-1;
+        var idCell = ws[XLSX.utils.encode_cell({r:r,c:1})];
+        var empId = idCell && idCell.v!==undefined ? String(idCell.v).trim() : '';
+        templateRows.push({empId:empId, rowData:rowData, isSample:isSample});
+      }
+
+      var allowanceMap = {};
+      results.forEach(function(r){ allowanceMap[normId(r.id)] = r; });
+
+      var mf = getAdjModalFields();
+      var withData = [], withoutData = [], filled = 0;
+      templateRows.filter(function(t){return !t.isSample;}).forEach(function(tr){
+        var r = allowanceMap[normId(tr.empId)];
+        if(r && r.total>0){
+          tr.rowData[3] = {t:'s', v:mf.adjType, s:{font:DATA_FONT}};
+          tr.rowData[4] = {t:'s', v:mf.adjName, s:{font:DATA_FONT}};
+          tr.rowData[5] = {t:'s', v:mf.adjCode, s:{font:DATA_FONT}};
+          tr.rowData[6] = {t:'n', v:r.total, s:{font:DATA_FONT}};
+          tr.rowData[7] = {t:'s', v:mf.adjName+' ('+r.tier+')', s:{font:DATA_FONT}};
+          tr.rowData[8] = {t:'s', v:mf.beforeTax, s:{font:DATA_FONT}};
+          tr.rowData[9] = {t:'s', v:mf.taxable, s:{font:DATA_FONT}};
+          withData.push(tr);
+          filled++;
+        } else {
+          withoutData.push(tr);
+        }
+      });
+
+      if(filled===0){
+        showToast('No employees matched the template. Make sure IDs line up with your Employee List.', 'error', 9000);
+        return;
+      }
+
+      for(var r2=2;r2<=range.e.r;r2++){
+        for(var c2=0;c2<=range.e.c;c2++){
+          var addr2 = XLSX.utils.encode_cell({r:r2,c:c2});
+          if(ws[addr2]) delete ws[addr2];
+        }
+      }
+
+      var sampleRows = templateRows.filter(function(t){return t.isSample;});
+      var rowsToWrite = hideZero ? sampleRows.concat(withData) : sampleRows.concat(withData, withoutData);
+      var rowIdx = 2;
+      rowsToWrite.forEach(function(tr){
+        Object.keys(tr.rowData).forEach(function(c){
+          var addr = XLSX.utils.encode_cell({r:rowIdx, c:parseInt(c)});
+          ws[addr] = Object.assign({}, tr.rowData[c]);
+        });
+        rowIdx++;
+      });
+      ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rowIdx-1, c:range.e.c}});
+      XLSX.writeFile(wb, 'Daily_Allowance_Adjustment_Template_'+new Date().toISOString().slice(0,10)+'.xlsx', {cellStyles:true});
+      logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+      showToast(hideZero
+        ? filled+' employee(s) with allowance exported. '+withoutData.length+' without data excluded.'
+        : filled+' employee(s) with allowance exported. '+withoutData.length+' without data grouped below.', 'success', 6000);
+    } catch(err){
+      showToast('Could not fill that template: '+err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(adjFile);
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+renderTierRows();
+renderEligTable();
+
+// ─── Tool Access Logging ───
+(function() {
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8HHHyTdkqx-vh4nGT2ao3sxeX1yTygF-U7urREPeSyn23E6-zPZLtXozGGswihjvKEg/exec';
+  try {
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    if (sess.email && sess.device_id) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', SCRIPT_URL, true);
+      xhr.setRequestHeader('Content-Type', 'text/plain');
+      xhr.send(JSON.stringify({
+        action: 'log_tool_access',
+        email: sess.email,
+        device_id: sess.device_id,
+        tool: 'V3 - Daily Allowance Generator'
+      }));
+    }
+  } catch(e) {}
+})();
+
+// ─── Export Logging ───
+function logExport(exportType, configSnapshot){
+  try {
+    var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8HHHyTdkqx-vh4nGT2ao3sxeX1yTygF-U7urREPeSyn23E6-zPZLtXozGGswihjvKEg/exec';
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    if (!sess.email || !sess.device_id) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', SCRIPT_URL, true);
+    xhr.setRequestHeader('Content-Type', 'text/plain');
+    xhr.send(JSON.stringify({
+      action: 'log_export',
+      email: sess.email,
+      device_id: sess.device_id,
+      tool: 'V3 - Daily Allowance Generator',
+      export_type: exportType,
+      config_snapshot: JSON.stringify(configSnapshot||{})
+    }));
+  } catch(e) {}
+}
+
+// ─── Access Control ───
+(function() {
+  try {
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    var access = (sess.access || '').toUpperCase(); // fail closed: no access data means no access, not full access
+    if (!sess.email || access.indexOf('V3') === -1) {
+      var denied = document.getElementById('access-denied');
+      if (denied) denied.classList.add('show');
+      var msg = document.getElementById('access-denied-msg');
+      if (msg && sess.email) msg.textContent = 'You don\'t have access to this tool. Contact your Customer Success Manager to request access.';
+      if (msg && !sess.email) msg.textContent = 'Please log in from the Hub first.';
+    }
+  } catch(e) {}
+})();
+</script>
+
+<footer class="app-footer">
+  <div class="footer-socials">
+    <span class="footer-brand">Sprout Solutions</span>
+    <a class="footer-social" href="https://www.facebook.com/SproutSolutionsPH" target="_blank" title="Facebook">
+      <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.instagram.com/sproutsolutionsph" target="_blank" title="Instagram">
+      <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.youtube.com/@SproutSolutionsPH" target="_blank" title="YouTube">
+      <svg viewBox="0 0 24 24"><path d="M23.495 6.205a3.007 3.007 0 00-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 00.527 6.205a31.247 31.247 0 00-.522 5.805 31.247 31.247 0 00.522 5.783 3.007 3.007 0 002.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 002.088-2.088 31.247 31.247 0 00.5-5.783 31.247 31.247 0 00-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.linkedin.com/company/sprout-solutions" target="_blank" title="LinkedIn">
+      <svg viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+    </a>
+  </div>
+</footer>
+</body>
+</html>
