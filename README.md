@@ -65,6 +65,8 @@ Onsite and WFH are the only two eligibility "primary identifiers" — every othe
 
 The Sheet itself (containing real names, emails, PINs, and usage/export logs) is **not** included here and should never be committed — it's the live data store, not code.
 
+**For the full picture** — Sheet column structure, supported actions, and how to onboard a user or grant tool access — see [`apps-script/GUIDE.md`](apps-script/GUIDE.md).
+
 ## Local development
 
 These are plain static files — no build step, no dependencies beyond what's loaded via CDN (`xlsx.full.min.js` for spreadsheet import/export). Open any of the four `.html` files directly in a browser to test, though note that `localStorage`-based sessions may not persist reliably when opened via `file://` in some browsers (Safari in particular) — hosting them on any static file server avoids that issue.
