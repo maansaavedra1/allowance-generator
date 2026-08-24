@@ -1,0 +1,1759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+<title>Bracket-Based Overtime Allowance Generator | HR Tools</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Generate OT allowance reports from employee and attendance data. Supports payroll instruction and adjustment template exports.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// ─── DateTime ───
+function updateDateTime(){
+  const el=document.getElementById('datetime');
+  if(!el)return;
+  const now=new Date();
+  const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d=days[now.getDay()];
+  const dt=String(now.getDate()).padStart(2,'0');
+  const mo=months[now.getMonth()];
+  const yr=now.getFullYear();
+  const hh=String(now.getHours()).padStart(2,'0');
+  const mm=String(now.getMinutes()).padStart(2,'0');
+  const ss=String(now.getSeconds()).padStart(2,'0');
+  el.textContent=d+', '+dt+' '+mo+' '+yr+' '+hh+':'+mm+':'+ss;
+}
+updateDateTime();
+setInterval(updateDateTime,1000);
+
+
+// ─── Session Timer ───
+
+
+
+
+
+</script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700&display=swap');
+  :root{--bg:#1a1d2e;--surface:#222640;--surface2:#272b45;--border:#333b5e;--stat-num:#dde3f0;--accent:#4ade80;--accent2:#38bdf8;--accent3:#f59e0b;--text:#dde3f0;--muted:#8892b0;--danger:#f87171;--eligible-bg:#0d2218;}
+  body.light{--bg:#f4f6fb;--surface:#fff;--surface2:#eef1f7;--border:#d0d7e8;--stat-num:#111827;--accent:#16a34a;--accent2:#0284c7;--accent3:#d97706;--text:#1a1f2e;--muted:#8892b0;--danger:#dc2626;--eligible-bg:#f0fdf4;}
+  .theme-toggle{display:flex;align-items:center;gap:8px;margin-left:20px;}
+  .toggle-switch{position:relative;width:44px;height:24px;cursor:pointer;}
+  .toggle-switch input{opacity:0;width:0;height:0;}
+  .toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:24px;transition:.3s;}
+  .toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:.3s;}
+  .toggle-switch input:checked+.toggle-slider{background:var(--accent2);}
+  .toggle-switch input:checked+.toggle-slider::before{transform:translateX(20px);background:#fff;}
+  .toggle-icon{font-size:14px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{display:flex;flex-direction:column;min-height:100vh;height:100%;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;gap:14px;}
+  .back-link{font-size:11px;color:var(--muted);text-decoration:none;padding:4px 10px;border:1px solid var(--border);border-radius:6px;transition:all .2s;margin-right:4px;}
+  .back-link:hover{color:var(--text);border-color:var(--accent);}
+  .logo-badge{background:var(--accent);color:#021a0d;font-weight:700;font-size:11px;letter-spacing:2px;padding:4px 10px;border-radius:4px;}
+  header h1{font-size:16px;font-weight:600;}
+  .header-right{margin-left:auto;font-size:11px;color:var(--muted);}
+  .main-grid{flex:1;display:grid;grid-template-columns:310px 1fr;min-height:calc(100vh - 61px);}
+
+  /* LEFT */
+  .left-panel{background:var(--surface);border-right:1px solid var(--border);padding:20px 18px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;}
+  .section-title{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+  .drop-zone{border:2px dashed var(--border);border-radius:10px;padding:14px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg);position:relative;margin-bottom:8px;}
+  .drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(74,222,128,.05);}
+  .drop-zone.dz-error{border-color:#ef4444!important;background:rgba(239,68,68,.08)!important;animation:dz-shake .4s ease;}
+  @keyframes dz-shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
+  .drop-zone.loaded{border-color:var(--accent);background:var(--eligible-bg);}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;}
+  .drop-zone.loaded input[type=file]{pointer-events:none;z-index:0;}
+  .drop-zone.loaded input[type=file]{pointer-events:none;}
+  .drop-icon{font-size:18px;margin-bottom:4px;}
+  .drop-label{font-size:12px;font-weight:600;margin-bottom:2px;}
+  .drop-hint{font-size:9px;color:var(--muted);}
+  .drop-filename{font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);margin-top:4px;word-break:break-all;}
+  .remove-file-btn{display:none;margin-top:6px;background:none;border:1px solid rgba(248,113,113,.35);color:var(--danger);font-family:'Sora',sans-serif;font-size:9px;font-weight:600;padding:2px 10px;border-radius:6px;cursor:pointer;position:relative;z-index:10;transition:all .2s;}
+  .remove-file-btn:hover{background:rgba(248,113,113,.1);}
+  .drop-zone.loaded .remove-file-btn{display:inline-block;}
+
+  /* Eligibility */
+  .elig-hint{font-size:9px;color:var(--muted);margin-bottom:10px;line-height:1.5;}
+  .filter-card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:7px;}
+  .filter-card-head{display:flex;align-items:center;gap:6px;margin-bottom:7px;}
+  .filter-card-head select{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:10px;padding:4px 7px;border-radius:6px;outline:none;}
+  .rm-filter-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:15px;padding:1px 4px;line-height:1;border-radius:4px;}
+  .rm-filter-btn:hover{color:var(--danger);}
+  .values-area{display:flex;flex-wrap:wrap;gap:4px;min-height:24px;}
+  .val-chip{display:flex;align-items:center;gap:3px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);color:var(--accent2);font-size:9px;padding:1px 6px 1px 8px;border-radius:12px;}
+  .val-chip button{background:none;border:none;color:var(--accent2);cursor:pointer;font-size:11px;padding:0;line-height:1;opacity:.7;}
+  .val-chip button:hover{opacity:1;}
+  .val-add-select{width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:9px;padding:4px 7px;border-radius:6px;outline:none;cursor:pointer;margin-top:5px;}
+  .no-vals-hint{font-size:9px;color:var(--muted);font-style:italic;}
+  .add-filter-btn{width:100%;background:none;border:1px dashed var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:9px;padding:6px;border-radius:7px;cursor:pointer;transition:all .2s;margin-top:2px;}
+  .add-filter-btn:hover{border-color:var(--accent);color:var(--accent);}
+  .add-filter-btn:disabled{opacity:.3;cursor:not-allowed;}
+
+  /* Allowance types */
+  /* Computation mode */
+  .comp-mode{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:12px;}
+  .comp-mode-options{display:flex;gap:6px;margin-bottom:6px;}
+  .comp-mode-btn{flex:1;padding:7px 6px;font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:none;color:var(--muted);transition:all .2s;text-align:center;}
+  .comp-mode-btn.active{background:var(--accent);color:#021a0d;border-color:var(--accent);}
+  .comp-mode-hint{font-size:9px;color:var(--muted);line-height:1.5;}
+
+  .atype-card{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;}
+  .atype-card:last-child{margin-bottom:0;}
+  .atype-header{display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--surface2);}
+  .atype-color-swatch{width:16px;height:16px;border-radius:4px;flex-shrink:0;cursor:pointer;border:2px solid rgba(255,255,255,.25);transition:transform .15s;}
+  .atype-color-swatch:hover{transform:scale(1.15);}
+  .atype-name-input{flex:1;background:transparent;border:none;color:var(--text);font-family:'Sora',sans-serif;font-size:11px;font-weight:600;outline:none;min-width:0;}
+  .atype-name-input::placeholder{color:var(--muted);}
+  .rm-atype-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 5px;line-height:1;}
+  .rm-atype-btn:hover{color:var(--danger);}
+  .atype-html,body{height:100%;}
+body{padding:10px;}
+  /* Color palette popover */
+  .palette-wrap{position:relative;flex-shrink:0;}
+  .palette-pop{display:none;position:absolute;top:24px;left:0;z-index:100;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.35);width:148px;}
+  .palette-pop.open{display:block;}
+  .palette-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
+  .palette-dot{width:18px;height:18px;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:transform .1s,border-color .1s;}
+  .palette-dot:hover{transform:scale(1.2);}
+  .palette-dot.selected{border-color:#fff;}
+
+  /* Payroll fields */
+  .payroll-fields{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
+  .payroll-field-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;}
+  .payroll-field-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;width:110px;flex-shrink:0;}
+  .payroll-field-input{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:10px;padding:4px 7px;border-radius:5px;outline:none;}
+  .payroll-field-input:focus{border-color:var(--accent);}
+  .payroll-field-select{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:10px;padding:4px 7px;border-radius:5px;outline:none;}
+
+  /* Shift type selector */
+  .shift-type-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+  .shift-type-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+  .shift-toggle{display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none;}
+  .shift-toggle input[type=checkbox]{accent-color:var(--accent2);width:12px;height:12px;cursor:pointer;}
+  .shift-toggle span{font-size:10px;color:var(--muted);}
+  .shift-toggle input:checked+span{color:var(--text);font-weight:600;}
+
+  /* Column picker */
+  .col-picker-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;}
+  .col-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;}
+  .col-chip{display:flex;align-items:center;gap:3px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);color:var(--accent);font-size:9px;padding:1px 6px 1px 8px;border-radius:12px;font-family:'DM Mono',monospace;}
+  .col-chip button{background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;padding:0;line-height:1;opacity:.7;}
+  .col-chip button:hover{opacity:1;}
+  .col-add-select{width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--muted);font-family:'DM Mono',monospace;font-size:9px;padding:4px 7px;border-radius:6px;outline:none;cursor:pointer;margin-bottom:8px;}
+
+  /* Brackets */
+  .bracket-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+  .bracket-table{width:100%;border-collapse:collapse;table-layout:fixed;}
+  .bracket-table th{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:2px 3px;text-align:left;}
+  .bracket-table th.r{text-align:right;}
+  .bracket-table th:nth-child(1){width:46%;}
+  .bracket-table th:nth-child(2){width:44%;}
+  .bracket-table th:nth-child(3){width:10%;}
+  .bracket-table td{padding:2px 2px;vertical-align:top;}
+  .b-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:11px;padding:4px 6px;border-radius:5px;width:100%;outline:none;}
+  .b-input:focus{border-color:var(--accent2);}
+  .b-input.r{text-align:right;}
+  .tier-hint{font-size:8px;color:var(--muted);margin-top:1px;padding-left:2px;font-family:'DM Mono',monospace;}
+  .del-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:2px 4px;border-radius:4px;line-height:1;}
+  .del-btn:hover{color:var(--danger);}
+  .add-tier-btn{width:100%;margin-top:5px;background:none;border:1px dashed var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:9px;padding:5px;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .add-tier-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+  .add-atype-btn{width:100%;background:none;border:1px dashed var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;padding:7px;border-radius:7px;cursor:pointer;transition:all .2s;}
+  .add-atype-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .run-btn{width:100%;padding:11px;background:var(--accent);color:#021a0d;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:opacity .2s,transform .1s;}
+  .run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px);}
+  .run-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .recalc-note{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;}
+  .recalc-note.dirty{color:var(--accent3);}
+
+  /* RIGHT */
+  .right-panel{overflow-y:auto;}
+  .right-inner{padding:22px 26px;}
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 15px;}
+  .stat-label{font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+  .stat-value{font-size:21px;font-weight:700;color:var(--stat-num);font-family:'DM Mono',monospace;}
+
+  .filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .filter-bar input,.filter-bar select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:6px 10px;border-radius:7px;outline:none;}
+  .filter-bar input{width:160px;}
+  .filter-label{font-size:10px;color:var(--muted);}
+  .export-btn{padding:6px 13px;background:transparent;border:1px solid var(--accent2);color:var(--accent2);font-family:'Sora',sans-serif;font-size:11px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;}
+  .export-btn:hover{background:var(--accent2);color:#021a0d;}
+  .export-btn.green{border-color:var(--accent);color:var(--accent);}
+  .export-btn.green:hover{background:var(--accent);color:#021a0d;}
+
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  thead th{background:var(--surface2);color:var(--muted);font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:9px 9px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+  thead th.num{text-align:right;}
+  .grp-header{border-top:2px solid;}
+  tbody tr.summary-row{border-bottom:1px solid rgba(42,48,80,.5);transition:background .15s;cursor:pointer;}
+  tbody tr.summary-row:hover{background:rgba(255,255,255,.03);}
+  tbody td{padding:10px 9px;vertical-align:middle;}
+  tbody td.num{text-align:right;font-family:'DM Mono',monospace;}
+  .toggle-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 4px;transition:transform .2s;line-height:1;}
+  .toggle-btn.open{transform:rotate(90deg);color:var(--accent2);}
+  .emp-name{font-weight:600;}
+  .emp-id{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;}
+  .grade-badge{display:inline-block;background:rgba(74,222,128,.12);color:var(--accent);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(74,222,128,.25);}
+  .status-badge{display:inline-block;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;}
+  .s-reg{background:rgba(56,189,248,.12);color:var(--accent2);}
+  .s-pro{background:rgba(245,158,11,.12);color:var(--accent3);}
+  .s-oth{background:rgba(107,116,148,.15);color:var(--muted);}
+  .allow-val{font-family:'DM Mono',monospace;font-weight:700;}
+  .allow-zero{color:var(--muted);}
+
+  tbody tr.detail-row{display:none;background:rgba(14,18,30,.6);}
+  body.light tbody tr.detail-row{background:rgba(230,235,245,.6);}
+  tbody tr.detail-row.open{display:table-row;}
+  tbody tr.detail-row td{padding:0;}
+  .detail-inner{padding:10px 14px 14px 44px;}
+  .detail-title{font-size:9px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;}
+  .day-table{width:100%;border-collapse:collapse;font-size:10px;}
+  .day-table th{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);padding:3px 7px;text-align:left;border-bottom:1px solid var(--border);}
+  .day-table th.r{text-align:right;}
+  .day-table td{padding:5px 7px;border-bottom:1px solid rgba(42,48,80,.25);vertical-align:middle;}
+  .day-table td.r{text-align:right;font-family:'DM Mono',monospace;}
+  .day-table tr:last-child td{border-bottom:none;}
+  .day-table tr.has-allow td{background:rgba(74,222,128,.03);}
+  .day-type-pill{display:inline-block;font-size:8px;font-weight:600;padding:1px 6px;border-radius:10px;}
+  .detail-total{display:flex;justify-content:flex-end;gap:22px;margin-top:9px;padding-top:7px;border-top:1px solid var(--border);font-size:11px;}
+  .detail-total-label{color:var(--muted);}
+  .detail-total-val{font-family:'DM Mono',monospace;font-weight:700;color:var(--accent);}
+
+  /* Toast notifications */
+  .toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;}
+  .toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;font-family:'Sora',sans-serif;font-size:12px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.3);animation:slideIn .2s ease;max-width:360px;}
+  .toast.success{background:#166534;color:#bbf7d0;border:1px solid #22c55e;}
+  .toast.error{background:#7f1d1d;color:#fecaca;border:1px solid #ef4444;}
+  .toast.warning{background:#78350f;color:#fde68a;border:1px solid #f59e0b;}
+  .toast.info{background:#1e3a5f;color:#bae6fd;border:1px solid #38bdf8;}
+  .toast-icon{font-size:16px;flex-shrink:0;}
+  .toast-msg{flex:1;line-height:1.4;}
+  @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  /* Loading overlay */
+  .loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8888;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;}
+  .loading-overlay.active{display:flex;}
+  .spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,.2);border-top-color:#4ade80;border-radius:50%;animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-msg{color:#fff;font-family:'Sora',sans-serif;font-size:13px;font-weight:500;}
+
+  .state-box{padding:80px 32px;text-align:center;color:var(--muted);}
+  .state-icon{font-size:44px;margin-bottom:14px;}
+  .state-title{font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px;}
+  .state-sub{font-size:12px;}
+  .no-results{padding:36px;text-align:center;color:var(--muted);font-size:13px;}
+
+  /* Adjustment Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:440px;max-width:calc(100vw - 40px);max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.45);overflow:hidden;}
+  .modal-header{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:12px;}
+  .modal-header .modal-icon{font-size:22px;line-height:1;}
+  .modal-title{font-size:15px;font-weight:700;margin-bottom:3px;}
+  .modal-sub{font-size:11px;color:var(--muted);line-height:1.5;}
+  .modal-body{padding:18px 24px;overflow-y:auto;flex:1;}
+  .modal-section-label{font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:2px 0 10px;display:flex;align-items:center;gap:8px;}
+  .modal-section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+  .modal-field{margin-bottom:13px;}
+  .modal-field label{display:block;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px;}
+  .modal-field input,.modal-field select{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:12px;padding:9px 11px;border-radius:8px;outline:none;transition:border-color .15s;}
+  .modal-field input:focus,.modal-field select:focus{border-color:var(--accent3);}
+  .modal-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .modal-preview{background:var(--surface2);border:1px dashed var(--border);border-radius:9px;padding:10px 12px;font-size:10px;color:var(--muted);line-height:1.6;margin-top:4px;}
+  .modal-preview b{color:var(--text);font-weight:600;}
+  .modal-actions{display:flex;gap:8px;padding:16px 24px;border-top:1px solid var(--border);justify-content:flex-end;flex-shrink:0;background:var(--surface2);}
+  .modal-btn{padding:9px 20px;font-family:'Sora',sans-serif;font-size:12px;font-weight:600;border-radius:8px;cursor:pointer;border:none;transition:all .2s;}
+  .modal-btn.primary{background:var(--accent3);color:#2b1a02;}
+  .modal-btn.primary:hover{opacity:.9;transform:translateY(-1px);}
+  .modal-btn.secondary{background:none;border:1px solid var(--border);color:var(--muted);}
+  .modal-btn.secondary:hover{border-color:var(--text);color:var(--text);}
+
+  /* Dark mode color adjustments */
+  body:not(.light) {
+    --wd-color: #4ade80;
+    --we-color: #fb923c;
+  }
+  body.light {
+    --wd-color: #16a34a;
+    --we-color: #ea580c;
+  }
+  body:not(.light) .stat-value { color: #f1f5f9 !important; }
+  body.light .stat-value { color: #111827 !important; }
+  body:not(.light) thead th { color: var(--muted); }
+  body:not(.light) thead th.wd { color: var(--wd-color); }
+  body:not(.light) thead th.we { color: var(--we-color); }
+  body:not(.light) thead th.tot { color: #4ade80; }
+  body.light thead th.tot { color: #16a34a; }
+
+  /* Footer */
+  .app-footer{margin-top:auto;background:var(--surface);border-top:1px solid var(--border);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:11px;color:var(--muted);}
+  .footer-socials{display:flex;align-items:center;gap:14px;}
+  .footer-social{color:var(--muted);text-decoration:none;transition:color .2s;display:flex;align-items:center;}
+  .footer-social:hover{color:var(--text);}
+  .footer-social svg{width:16px;height:16px;fill:currentColor;}
+
+  .footer-brand{font-size:10px;color:var(--muted);}
+
+  
+
+
+  
+
+  
+
+  
+
+  
+
+  /* Access Denied */
+  .access-denied{position:fixed;inset:0;background:var(--bg);z-index:99998;display:none;align-items:center;justify-content:center;}
+  .access-denied.show{display:flex;}
+  .access-denied-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 32px;width:380px;max-width:90vw;text-align:center;box-shadow:0 24px 64px rgba(0,0,0,.3);}
+  .access-denied-icon{font-size:48px;margin-bottom:16px;}
+  .access-denied-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px;}
+  .access-denied-sub{font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:24px;}
+  .access-denied-btn{padding:10px 24px;border-radius:10px;border:none;background:#16a34a;color:#fff;font-family:'Sora',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
+</style>
+</head>
+<body>
+<div class="toast-container" id="toast-container"></div>
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-msg" id="loading-msg">Processing...</div>
+</div>
+<div class="modal-overlay" id="adj-modal" onclick="if(event.target===this)closeAdjModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-icon">⬇</div>
+      <div>
+        <div class="modal-title">Adjustment Template Settings</div>
+        <div class="modal-sub">These fields will be written into every row of the exported template.</div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-label">Adjustment details</div>
+      <div class="modal-field"><label>Adjustment Type</label><select id="m-adj-type"><option value="Basic Adjustment">Basic Adjustment</option><option value="Salary Adjustment">Salary Adjustment</option><option value="Allowance" selected>Allowance</option><option value="Reimbursable Allowance">Reimbursable Allowance</option><option value="Non Prorated Allowance">Non Prorated Allowance</option><option value="Deminimis Allowance">Deminimis Allowance</option><option value="Deminimis Adjustment">Deminimis Adjustment</option><option value="Bonus">Bonus</option><option value="Commissions">Commissions</option><option value="Overtime Adjustment">Overtime Adjustment</option><option value="Monetized Leave">Monetized Leave</option><option value="Other Non Taxable Income">Other Non Taxable Income</option><option value="Other Taxable Income">Other Taxable Income</option><option value="13th Month NonTaxable">13th Month NonTaxable</option><option value="13th Month Taxable">13th Month Taxable</option><option value="Withholding Tax">Withholding Tax</option><option value="Miscellaneous">Miscellaneous</option></select></div>
+      <div class="modal-field"><label>Adjustment Name</label><input id="m-adj-name" type="text" value="Work Extension Allowance"></div>
+      <div class="modal-field"><label>Adjustment Code</label><input id="m-adj-code" type="text" value="Allowance"></div>
+      <div class="modal-section-label">Tax treatment</div>
+      <div class="modal-row">
+        <div class="modal-field"><label>Apply Before Tax</label><select id="m-adj-before-tax"><option value="No" selected>No</option><option value="Yes">Yes</option></select></div>
+        <div class="modal-field"><label>Is Taxable</label><select id="m-adj-taxable"><option value="Yes" selected>Yes</option><option value="No">No</option></select></div>
+      </div>
+      <div class="modal-preview" id="adj-modal-preview"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn secondary" onclick="closeAdjModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="confirmAdjExport()">Export</button>
+    </div>
+  </div>
+</div>
+</div>
+
+
+
+
+
+
+<div class="access-denied" id="access-denied">
+  <div class="access-denied-card">
+    <div class="access-denied-icon">🔒</div>
+    <div class="access-denied-title">Access Restricted</div>
+    <div class="access-denied-sub" id="access-denied-msg">You don't have access to this tool.<br>Contact your Customer Success Manager to request access.</div>
+    <button class="access-denied-btn" onclick="window.location.href='index.html'">← Back to Hub</button>
+  </div>
+</div>
+<header>
+  <a class="back-link" href="index.html">← Hub</a>
+  <div class="logo-badge">V1</div>
+  <div>
+    <h1>Bracket-Based Overtime Allowance Generator</h1>
+    <p style="font-size:11px;color:var(--muted);margin-top:2px">Allowances computed per OT hour bracket threshold</p>
+  </div>
+  <div class="header-right" style="display:flex;align-items:center;gap:12px;"><span id="datetime" style="font-size:11px;color:var(--muted);margin-right:16px;font-family:'DM Mono',monospace;"></span><span id="period-label">No files loaded</div>
+  <div class="theme-toggle">
+    <span class="toggle-icon">Dark</span>
+    <label class="toggle-switch">
+      <input type="checkbox" id="theme-toggle" onchange="toggleTheme(this)">
+      <span class="toggle-slider"></span>
+    </label>
+    <span class="toggle-icon">Light</span>
+  </div>
+</header>
+
+<div class="main-grid">
+  <!-- LEFT -->
+  <div class="left-panel">
+
+    <div>
+      <div class="section-title">Input Files</div>
+      <div class="drop-zone" id="dz-emp" ondragover="dz(event,'emp',true)" ondragleave="dz(event,'emp',false)" ondrop="drop(event,'emp')">
+        <input type="file" accept=".xls,.xlsx" onchange="fileChosen(event,'emp')" id="fi-emp">
+        <div class="drop-icon">👤</div>
+        <div class="drop-label">Employee List</div>
+        <div class="drop-hint">Upload first — all eligibility values pre-selected</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="fn-emp"></div>
+        <button class="remove-file-btn" onclick="removeFile(event,'emp')">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="dz-att" ondragover="dz(event,'att',true)" ondragleave="dz(event,'att',false)" ondrop="drop(event,'att')">
+        <input type="file" accept=".xls,.xlsx" onchange="fileChosen(event,'att')" id="fi-att">
+        <div class="drop-icon">📋</div>
+        <div class="drop-label">Attendance Report</div>
+        <div class="drop-hint">Must have Summary + Detailed sheets</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout HR</div>
+        <div class="drop-filename" id="fn-att"></div>
+        <button class="remove-file-btn" onclick="removeFile(event,'att')">✕ Remove</button>
+      </div>
+      <div class="drop-zone" id="dz-adj" ondragover="dz(event,'adj',true)" ondragleave="dz(event,'adj',false)" ondrop="drop(event,'adj')">
+        <input type="file" accept=".xls,.xlsx" onchange="fileChosen(event,'adj')" id="fi-adj">
+        <div class="drop-icon">📄</div>
+        <div class="drop-label">Adjustment Template</div>
+        <div class="drop-hint">Fresh template from Payrollpie — optional</div>
+        <div class="drop-hint" style="color:#ef4444;font-weight:700;margin-top:2px">⚠ Extract from Sprout Payroll</div>
+        <div class="drop-filename" id="fn-adj"></div>
+        <button class="remove-file-btn" onclick="removeFile(event,'adj')">✕ Remove</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-title">Eligibility Criteria</div>
+      <div class="elig-hint">All active filters must match. Upload employee file first to see available fields.</div>
+      <div id="elig-filters"></div>
+      <button class="add-filter-btn" id="add-filter-btn" onclick="addFilter()" disabled>+ Add eligibility field</button>
+    </div>
+
+    <div>
+      <div class="section-title">Computation Mode</div>
+      <div class="comp-mode">
+        <div class="comp-mode-options">
+          <button class="comp-mode-btn active" id="mode-perday" onclick="setCompMode('perday')">Per Day</button>
+          <button class="comp-mode-btn" id="mode-shifttype" onclick="setCompMode('shifttype')">Per Shift Type</button>
+          <button class="comp-mode-btn" id="mode-accumulated" onclick="setCompMode('accumulated')">Total Period</button>
+        </div>
+        <div class="comp-mode-hint" id="comp-mode-hint">Each day's OT hours checked against brackets → daily allowances summed.</div>
+      </div>
+
+      <div class="section-title">Allowance Types</div>
+      <div id="atype-list"></div>
+      <button class="add-atype-btn" onclick="addAllowanceType()">+ Add allowance type</button>
+    </div>
+
+    <div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button onclick="saveConfig()" style="flex:1;padding:8px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">💾 Save Config</button>
+        <label style="flex:1;padding:8px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📂 Load Config<input type="file" accept=".json" style="display:none" onchange="loadConfig(event)"></label>
+        <button onclick="clearConfig()" title="Reset to defaults" style="padding:8px 10px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺</button>
+      </div>
+      <button class="run-btn" id="run-btn" onclick="processFiles()" disabled>Generate Report</button>
+      <div class="recalc-note" id="recalc-note">Upload both files to generate</div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+    <div class="right-inner">
+      <div class="state-box" id="state-placeholder">
+        <div class="state-icon">📂</div>
+        <div class="state-title">Ready to generate</div>
+        <div class="state-sub">Upload files, define allowance types, then click Generate.</div>
+      </div>
+      <div class="state-box" id="state-empty" style="display:none">
+        <div class="state-icon">🔍</div>
+        <div class="state-title">No Eligible Employees Found</div>
+        <div class="state-sub">No employees matched the eligibility criteria.<br>Adjust filters and re-generate.</div>
+      </div>
+      <div id="results-section" style="display:none">
+        <div class="stats-row">
+          <div class="stat-card"><div class="stat-label">Eligible</div><div class="stat-value" id="s-eligible">0</div></div>
+          <div class="stat-card"><div class="stat-label">With Allowance</div><div class="stat-value" id="s-with-ot">0</div></div>
+          <div class="stat-card"><div class="stat-label">Total OT (HH:MM)</div><div class="stat-value" id="s-ot-days">00:00</div></div>
+          <div class="stat-card"><div class="stat-label">Total Allowance</div><div class="stat-value" id="s-total-allow">₱0</div></div>
+        </div>
+        <div class="filter-bar">
+          <span class="filter-label">Search:</span>
+          <input type="text" id="search" placeholder="Name or ID…" oninput="renderTable()">
+          <select id="dept-filter" onchange="renderTable()"><option value="">All Departments</option></select>
+          <select id="status-filter" onchange="renderTable()"><option value="">All Statuses</option></select>
+          <select id="ot-filter" onchange="renderTable()">
+            <option value="">All employees</option>
+            <option value="has_ot">With allowance only</option>
+            <option value="no_ot">No allowance</option>
+          </select>
+          <label class="filter-label" style="display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="hide-zero" onchange="renderTable()"> Hide ₱0 allowance / no data
+          </label>
+        </div>
+        <div class="filter-bar" style="margin-bottom:14px">
+          <span class="filter-label">Export:</span>
+          <button class="export-btn" style="background:#16a34a;border-color:#16a34a;color:#fff" onclick="exportExcel()">⬇ Export Excel</button>
+          <button class="export-btn" style="background:#16a34a;border-color:#16a34a;color:#fff" onclick="openAdjModal()">⬇ Adjustment Template</button>
+          <button class="export-btn" style="background:#16a34a;border-color:#16a34a;color:#fff" onclick="exportPayroll()">⬇ Payroll Instruction</button>
+        </div>
+        <div class="table-wrap">
+          <table id="main-table">
+            <thead id="main-thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div class="no-results" id="no-results" style="display:none">No employees match the current filters.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let sortField='name', sortDir='asc';
+let computeMode='perday';
+let empFile=null, attFile=null, allRecords=[], empRows=[], empColumns=[], attColumns=[];
+let eligFilters=[];
+
+// Allowance types — user-defined
+// Each: { id, name, color, shiftTypes:[], cols:[], brackets:[{hours,amount}] }
+let allowanceTypes=[
+  {id:'ot',   name:'OT Allowance',            color:'#16a34a', shiftTypes:['Regular','Rest Day','Holiday'], cols:['OrdOT','OrdND','OrdNDOT','RD','RDOT','RDND','RDNDOT','SH','SHOT','SHND','SHNDOT','LH','LHOT','LHND','LHNDOT','DH','DHOT','DHNDOT'], brackets:[{hours:3,amount:200},{hours:8,amount:600},{hours:11,amount:800}], adjType:'Allowance', adjName:'Work Extension Allowance', adjCode:'Allowance', beforeTax:'No', taxable:'Yes'},
+  {id:'meal', name:'Meal Allowance',           color:'#0284c7', shiftTypes:['Regular','Rest Day','Holiday'], cols:['OrdOT','OrdND','OrdNDOT','RD','RDOT','RDND','RDNDOT','SH','SHOT','SHND','SHNDOT','LH','LHOT','LHND','LHNDOT','DH','DHOT','DHNDOT'], brackets:[{hours:1,amount:0}],                                         adjType:'Allowance', adjName:'Meal Allowance',           adjCode:'Allowance', beforeTax:'No', taxable:'Yes'},
+  {id:'trans',name:'Transportation Allowance', color:'#9333ea', shiftTypes:['Regular','Rest Day','Holiday'], cols:['OrdOT','OrdND','OrdNDOT','RD','RDOT','RDND','RDNDOT','SH','SHOT','SHND','SHNDOT','LH','LHOT','LHND','LHNDOT','DH','DHOT','DHNDOT'], brackets:[{hours:1,amount:0}],                                         adjType:'Allowance', adjName:'Transportation Allowance', adjCode:'Allowance', beforeTax:'No', taxable:'Yes'},
+];
+
+const TYPE_COLORS=['#16a34a','#ca8a04','#dc2626','#0284c7','#9333ea','#ec4899','#14b8a6','#f97316'];
+const PALETTE=[
+  '#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e',
+  '#16a34a','#14b8a6','#06b6d4','#0284c7','#3b82f6','#6366f1',
+  '#8b5cf6','#a855f7','#9333ea','#ec4899','#f43f5e','#64748b',
+  '#ca8a04','#dc2626','#b45309','#047857','#0e7490','#1d4ed8',
+];
+
+const OT_COLUMNS=["Total Hours Worked","OrdOT","OrdND","OrdNDOT","RD","RDOT","RDND","RDNDOT","SH","SHOT","SHND","SHNDOT","LH","LHOT","LHND","LHNDOT","SHRD","SHRDOT","SHRDND","SHRDNDOT","LHRD","LHRDOT","LHRDND","LHRDNDOT","DH","DHND","DHRD","DHRDND","DHOT","DHNDOT","DHRDOT","DHRDNDOT"];
+
+function togglePalette(e,ai){
+  e.stopPropagation();
+  // Close all others
+  document.querySelectorAll('.palette-pop').forEach((p,i)=>{if(i!==ai)p.classList.remove('open');});
+  document.getElementById('pal-'+ai).classList.toggle('open');
+}
+function pickColor(ai,color){
+  allowanceTypes[ai].color=color;
+  document.getElementById('pal-'+ai).classList.remove('open');
+  renderAllowanceTypes();
+  markDirty();
+}
+// Close palettes on outside click
+document.addEventListener('click',()=>document.querySelectorAll('.palette-pop').forEach(p=>p.classList.remove('open')));
+let colorIdx=TYPE_COLORS.length; // next color for new types
+
+const EXCLUDED_COLS=new Set(['System ID','Employee ID','EmployeeID','Last Name','First Name','Middle Name','Username','Birthday','Age','Address','SSS','TIN','PhilHealth','PRC No.','Pag-IBIG No.','Passport No.','Biometric ID','Email','Contact','Skype','Training','Employment Records','Educational Background','Movement','Bank Accounts','Salary Details','Contact Info','Emergency Contact','Dependents','Base Salary','De Minimis','Transportation','Meal','Communication','Travel','Others','Monthly Gross','Extension','Hire Date','Regularization Date','Separation Date','Schedule','No. of Hours to Work','Payroll Pie ID','Approver 2','Approver 3','Approver 4','Approver 5','Immediate Supervisor','Reason for Leaving']);
+
+// ════════════════════════════════════════════
+// THEME
+// ════════════════════════════════════════════
+
+// ─── Toast Notifications ───
+function showToast(msg, type='info', duration=4000){
+  const ct=document.getElementById('toast-container');
+  const icons={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`<span class="toast-icon">${icons[type]||'ℹ️'}</span><span class="toast-msg">${msg}</span>`;
+  ct.appendChild(t);
+  setTimeout(()=>{t.style.animation='slideIn .2s ease reverse';setTimeout(()=>t.remove(),200);},duration);
+}
+function showLoading(msg='Processing files...'){
+  document.getElementById('loading-msg').textContent=msg;
+  document.getElementById('loading-overlay').classList.add('active');
+}
+function hideLoading(){
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+
+// ─── File Validation ───
+function validateEmpFile(rows){
+  if(!rows.length)
+    return 'Heads up! The Employee List appears empty. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  const cols=Object.keys(rows[0]).map(k=>k.toLowerCase());
+  // Reject if it looks like an attendance report
+  const attCols=['days present','days absent','total hours worked','undertime','overbreaks'];
+  if(attCols.some(c=>cols.some(k=>k.includes(c))))
+    return 'Heads up! This looks like an Attendance Report, not an Employee List. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  // Reject if it looks like a Payrollpie adjustment template
+  const adjCols=['adjustment type','adjustment amount','adjustment code','apply before tax','is taxable','status'];
+  if(adjCols.filter(c=>cols.some(k=>k.includes(c))).length>=3)
+    return 'Heads up! This looks like a Payrollpie Adjustment Template, not an Employee List. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  // Must have Employee ID column
+  const hasEmpId=cols.some(k=>k.includes('employee id')||k.includes('emp id')||k==='id no');
+  if(!hasEmpId)
+    return 'Heads up! This doesn\'t look like the Employee List Report. Head to Sprout HR → Administration Tools → Employee List Report, export the file, and try again.';
+  return null;
+}
+function validateAttFile(wb){
+  const sheets=wb.SheetNames;
+  if(!sheets.includes('Detailed')&&sheets.length<2)
+    return 'Heads up! This doesn\'t look like the Attendance Report. Head to Sprout HR → Administration Tools → Attendance Report, export with both Summary and Detailed sheets included, then try again.';
+  const detWs=wb.Sheets['Detailed']||wb.Sheets[sheets[1]];
+  const detRaw=detWs?XLSX.utils.sheet_to_json(detWs,{header:1,defval:''}):[];
+  const hasDateCol=detRaw.some(r=>String(r[0]||'').trim()==='Date');
+  if(!hasDateCol)
+    return 'Heads up! The file format isn\'t recognized. Make sure you\'re using the Attendance Report from Sprout HR → Administration Tools → Attendance Report. Export it and try again.';
+  if(!sheets.includes('Summary'))
+    return 'Heads up! The Summary sheet is missing. When exporting from Sprout HR → Administration Tools → Attendance Report, make sure both Summary and Detailed sheets are included.';
+  return null;
+}
+
+
+
+// ─── Computation Mode ───
+const COMP_MODE_HINTS={
+  perday:    "Each day's OT hours → bracket → daily allowance. Summed across all days.",
+  shifttype: "Total OT grouped by shift type (Regular / Rest Day / Holiday) → each group cross-referenced against bracket.",
+  accumulated:"All OT hours for the entire period combined → cross-referenced against bracket once.",
+};
+function setCompMode(mode){
+  computeMode=mode;
+  document.getElementById('mode-perday').classList.toggle('active',mode==='perday');
+  document.getElementById('mode-shifttype').classList.toggle('active',mode==='shifttype');
+  document.getElementById('mode-accumulated').classList.toggle('active',mode==='accumulated');
+  document.getElementById('comp-mode-hint').textContent=COMP_MODE_HINTS[mode]||'';
+  autoSaveConfig();
+  markDirty();
+}
+
+
+// ─── Adjustment Modal ───
+function openAdjModal(){
+  // Restore last used values from localStorage
+  try{
+    const saved=JSON.parse(localStorage.getItem('adj-modal-config')||'{}');
+    if(saved.adjType)document.getElementById('m-adj-type').value=saved.adjType;
+    if(saved.adjName)document.getElementById('m-adj-name').value=saved.adjName;
+    if(saved.adjCode)document.getElementById('m-adj-code').value=saved.adjCode;
+    if(saved.beforeTax)document.getElementById('m-adj-before-tax').value=saved.beforeTax;
+    if(saved.taxable)document.getElementById('m-adj-taxable').value=saved.taxable;
+  }catch(e){if(typeof showToast==='function')showToast('An error occurred. Please try again.','warning',3000);}
+  updateAdjModalPreview();
+  document.getElementById('adj-modal').classList.add('open');
+}
+function closeAdjModal(){
+  document.getElementById('adj-modal').classList.remove('open');
+}
+function getAdjModalFields(){
+  const fields={
+    adjType:document.getElementById('m-adj-type').value,
+    adjName:document.getElementById('m-adj-name').value,
+    adjCode:document.getElementById('m-adj-code').value,
+    beforeTax:document.getElementById('m-adj-before-tax').value,
+    taxable:document.getElementById('m-adj-taxable').value,
+  };
+  try{localStorage.setItem('adj-modal-config',JSON.stringify(fields));}catch(e){if(typeof showToast==='function')showToast('An error occurred. Please try again.','warning',3000);}
+  return fields;
+}
+function updateAdjModalPreview(){
+  const f=getAdjModalFields();
+  const el=document.getElementById('adj-modal-preview');
+  if(el)el.innerHTML='Each row will be written as: <b>'+f.adjType+'</b> — <b>'+f.adjName+'</b> (code <b>'+f.adjCode+'</b>), before-tax: <b>'+f.beforeTax+'</b>, taxable: <b>'+f.taxable+'</b>.';
+}
+document.getElementById('adj-modal').addEventListener('input', updateAdjModalPreview);
+function confirmAdjExport(){
+  closeAdjModal();
+  const rows=getFiltered();
+  if(!rows.length){showToast('No employees with allowance to export.','warning');return;}
+  if(adjFile){exportAdjustmentFromTemplate(rows,adjFile);}
+  else{exportAdjustmentEmbedded(rows);}
+}
+// Close modal on overlay click
+document.addEventListener('click',function(e){
+  if(e.target.id==='adj-modal')closeAdjModal();
+});
+
+// ─── Save / Load Config ───
+function clearConfig(){
+  if(!confirm('Reset all settings to defaults?'))return;
+  localStorage.removeItem('ot-allowance-config');
+  location.reload();
+}
+function saveConfig(){
+  const config={version:'v1',allowanceTypes:allowanceTypes,eligFilters:eligFilters,computeMode:computeMode};
+  try{localStorage.setItem('ot-allowance-config',JSON.stringify(config));}catch(e){if(typeof showToast==='function')showToast('An error occurred: '+e.message,'warning',3000);}
+  const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='OT_Allowance_Config_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function loadConfig(e){
+  const file=e.target.files[0];if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const cfg=JSON.parse(ev.target.result);
+      if(cfg.version!=='v1'){showToast('This config file is not compatible with this version.','error',5000);return;}
+      if(cfg.allowanceTypes)allowanceTypes=cfg.allowanceTypes;
+      if(cfg.eligFilters)eligFilters=cfg.eligFilters;
+      renderAllowanceTypes();renderEligFilters();showToast('Config loaded successfully.','success',3000);
+    }catch(err){showToast('Invalid config file. Please use a valid config JSON.','error',4000);}
+  };
+  r.readAsText(file);e.target.value='';
+}
+function autoSaveConfig(){
+  try{localStorage.setItem('ot-allowance-config',JSON.stringify({version:'v1',allowanceTypes:allowanceTypes,eligFilters:eligFilters,computeMode:computeMode}));}catch(e){showToast('Could not auto-save config.','warning',2000);}
+}
+function autoLoadConfig(){
+  try{
+    const saved=localStorage.getItem('ot-allowance-config');if(!saved)return;
+    const cfg=JSON.parse(saved);if(cfg.version!=='v1')return;
+    if(cfg.allowanceTypes)allowanceTypes=cfg.allowanceTypes;
+    if(cfg.eligFilters)eligFilters=cfg.eligFilters;
+    if(cfg.computeMode&&['perday','shifttype','accumulated'].includes(cfg.computeMode))setCompMode(cfg.computeMode);
+    renderAllowanceTypes();renderEligFilters();
+    showToast('Previous config restored.','info',2000);
+  }catch(e){
+    localStorage.removeItem('ot-allowance-config');
+    if(typeof showToast==='function')showToast('Saved config was outdated and has been cleared.','warning',3000);
+  }
+}
+function toggleTheme(cb){
+  document.body.classList.toggle('light',cb.checked);
+  localStorage.setItem('hr-theme',cb.checked?'light':'dark');
+  applyThemeColors();
+}
+function applyThemeColors(){
+  const isLight=document.body.classList.contains('light');
+  if(typeof wdColor!=='undefined'){
+    document.documentElement.style.setProperty('--wd-color', wdColor);
+    document.documentElement.style.setProperty('--we-color', weColor);
+  }
+}
+
+// ════════════════════════════════════════════
+// ALLOWANCE TYPE UI
+// ════════════════════════════════════════════
+function renderAllowanceTypes(){
+  document.getElementById('atype-list').innerHTML=allowanceTypes.map((at,ai)=>`
+    <div class="atype-card" id="atcard-${ai}">
+      <div class="atype-header">
+        <div class="palette-wrap">
+          <div class="atype-color-swatch" style="background:${at.color}" title="Pick color"
+            onclick="togglePalette(event,${ai})"></div>
+          <div class="palette-pop" id="pal-${ai}">
+            <div class="palette-grid">
+              ${PALETTE.map(c=>`<div class="palette-dot${at.color===c?' selected':''}" style="background:${c}"
+                onclick="pickColor(${ai},'${c}')"></div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <input class="atype-name-input" type="text" value="${esc(at.name)}" placeholder="Allowance name…"
+          onchange="allowanceTypes[${ai}].name=this.value;markDirty();">
+        <button class="rm-atype-btn" onclick="removeAllowanceType(${ai})" title="Remove">×</button>
+      </div>
+      <div class="atype-body">
+        <div class="shift-type-label">Applies to</div>
+        <div class="shift-type-row">
+          ${['Regular','Rest Day','Holiday'].map(st=>`
+            <label class="shift-toggle">
+              <input type="checkbox" ${at.shiftTypes.includes(st)?'checked':''}
+                onchange="toggleShiftType(${ai},'${st}',this.checked)">
+              <span>${st}</span>
+            </label>`).join('')}
+        </div>
+        <div class="col-picker-label">Summary OT columns to sum</div>
+        <div class="col-chips">
+          ${at.cols.map((c,ci)=>`<span style="display:flex;align-items:center;gap:3px;background:${at.color}1a;border:1px solid ${at.color}44;color:${at.color};font-size:9px;padding:1px 6px 1px 8px;border-radius:12px;font-family:'DM Mono',monospace">${esc(c)}<button style="background:none;border:none;color:${at.color};cursor:pointer;font-size:11px;padding:0;line-height:1;opacity:.7" onclick="removeAtypeCol(${ai},${ci})">×</button></span>`).join('')}
+          ${at.cols.length===0?`<span style="font-size:9px;color:var(--muted);font-style:italic">No columns — add below</span>`:''}
+        </div>
+        <select class="col-add-select" onchange="addAtypeCol(${ai},this.value);this.selectedIndex=0;">
+          <option value="">+ Add column…</option>
+          ${attColumns.filter(c=>!at.cols.includes(c)).map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+          ${attColumns.length===0?`<option disabled>Upload attendance file first</option>`:''}
+        </select>
+        <div class="bracket-label">Allowance Brackets</div>
+        <table class="bracket-table">
+          <thead><tr><th>Min OT / Rendered Hrs</th><th class="r">Amount (₱)</th><th></th></tr></thead>
+          <tbody>${renderBracketRows(ai)}</tbody>
+        </table>
+        <button class="add-tier-btn" onclick="addBracketTier(${ai})">+ Add tier</button>
+      </div>
+    </div>`).join('');
+  markDirty();
+}
+
+function renderBracketRows(ai){
+  const sorted=[...allowanceTypes[ai].brackets].sort((a,b)=>a.hours-b.hours);
+  return sorted.map((b,i)=>{
+    const next=sorted[i+1];
+    const floor=i===0?1:b.hours;
+    const ceiling=next?`up to less than ${next.hours}h`:`and above`;
+    const hint=`${floor}h ${ceiling}`;
+    return`<tr>
+      <td><input class="b-input" type="number" min="0" step="0.5" value="${b.hours}"
+        onchange="updBracket(${ai},${i},'hours',this.value)">
+        <div class="tier-hint" id="hint-${ai}-${i}">${hint}</div></td>
+      <td><input class="b-input r" type="number" min="0" value="${b.amount}"
+        onchange="updBracket(${ai},${i},'amount',this.value)"></td>
+      <td><button class="del-btn" onclick="delBracketTier(${ai},${i})">×</button></td>
+    </tr>`;
+  }).join('');
+}
+
+const SHIFT_COLS={
+  'Regular':  ['OrdOT','OrdND','OrdNDOT'],
+  'Rest Day': ['RD','RDOT','RDND','RDNDOT'],
+  'Holiday':  ['SH','SHOT','SHND','SHNDOT','LH','LHOT','LHND','LHNDOT','DH','DHOT','DHNDOT'],
+};
+
+function addAllowanceType(){
+  const color=TYPE_COLORS[colorIdx%TYPE_COLORS.length]; colorIdx++;
+  const allCols=[...SHIFT_COLS['Regular'],...SHIFT_COLS['Rest Day'],...SHIFT_COLS['Holiday']];
+  allowanceTypes.push({id:'at'+Date.now(),name:'New Allowance',color,shiftTypes:['Regular','Rest Day','Holiday'],cols:allCols,brackets:[{hours:1,amount:0}],adjType:'Allowance',adjName:'New Allowance',adjCode:'Allowance',beforeTax:'No',taxable:'Yes'});
+  renderAllowanceTypes();
+}
+function removeAllowanceType(ai){
+  if(allowanceTypes.length<=1){showToast('At least one allowance type is required.','warning',3000);return;}
+  allowanceTypes.splice(ai,1); renderAllowanceTypes();
+}
+function updAtype(ai,field,val){allowanceTypes[ai][field]=val;autoSaveConfig();markDirty();}
+function addAtypeCol(ai,col){
+  if(!col)return;
+  if(!allowanceTypes[ai].cols.includes(col))allowanceTypes[ai].cols.push(col);
+  renderAllowanceTypes();
+}
+function removeAtypeCol(ai,ci){allowanceTypes[ai].cols.splice(ci,1);renderAllowanceTypes();}
+
+function toggleShiftType(ai,st,checked){
+  const at=allowanceTypes[ai];
+  if(!at.shiftTypes)at.shiftTypes=[];
+  if(checked){
+    if(!at.shiftTypes.includes(st))at.shiftTypes.push(st);
+    // Auto-add columns for this shift type (if not already present)
+    for(const c of (SHIFT_COLS[st]||[])){
+      if(!at.cols.includes(c))at.cols.push(c);
+    }
+  } else {
+    at.shiftTypes=at.shiftTypes.filter(s=>s!==st);
+    // Auto-remove columns that belong exclusively to this shift type
+    // (only remove if no other checked shift type also uses that col)
+    const remainingCols=new Set(at.shiftTypes.flatMap(s=>SHIFT_COLS[s]||[]));
+    at.cols=at.cols.filter(c=>remainingCols.has(c));
+  }
+  renderAllowanceTypes();
+  markDirty();
+}
+function updBracket(ai,i,f,v){
+  allowanceTypes[ai].brackets[i][f]=parseFloat(v)||0;
+  allowanceTypes[ai].brackets.sort((a,b)=>a.hours-b.hours);
+  renderAllowanceTypes();
+}
+function addBracketTier(ai){
+  const bk=allowanceTypes[ai].brackets;
+  const mx=bk.length?Math.max(...bk.map(b=>b.hours))+1:1;
+  bk.push({hours:mx,amount:0}); renderAllowanceTypes();
+}
+function delBracketTier(ai,i){
+  if(allowanceTypes[ai].brackets.length<=1){showToast('At least one bracket tier is required.','warning',3000);return;}
+  allowanceTypes[ai].brackets.splice(i,1); renderAllowanceTypes();
+}
+
+// ════════════════════════════════════════════
+// BRACKET CALC
+// ════════════════════════════════════════════
+function calcAllow(otHours,brackets){
+  if(otHours<=0)return 0;
+  const sorted=[...brackets].sort((a,b)=>a.hours-b.hours);
+  let r=0; for(const b of sorted){if(otHours>=b.hours)r=b.amount;} return r;
+}
+function bracketLabel(otHours,brackets){
+  if(otHours<=0)return'—';
+  const sorted=[...brackets].sort((a,b)=>a.hours-b.hours);
+  let hit=null; for(const b of sorted){if(otHours>=b.hours)hit=b;}
+  if(hit)return`≥${hit.hours}h → ₱${hit.amount.toLocaleString()}`;
+  return`< ${sorted[0].hours}h — no allowance`;
+}
+
+// ════════════════════════════════════════════
+// SHIFT CLASSIFICATION (for day-type pill display)
+// ════════════════════════════════════════════
+function classifyShift(shift){
+  const s=String(shift||'').trim().toUpperCase();
+  if(!s||['HOLIDAY','REST DAY','REST DAY AND HOLIDAY','NOT YET HIRED','ON LEAVE'].includes(s)) return null;
+  if(s.includes('(REST DAY)')) return 'Rest Day';
+  if(s.includes('(HOLIDAY)')||s.includes('(UNPAID HOLIDAY)')) return 'Holiday';
+  if(s==='NAN'||s==='') return null;
+  return 'Regular';
+}
+
+// ════════════════════════════════════════════
+// PARSE HELPERS
+// ════════════════════════════════════════════
+function parseHours(v){
+  const s=String(v||'').trim();
+  if(!s||s==='0'||s==='00:00'||s.toLowerCase()==='nan')return 0;
+  if(s.includes(':')){const[h,m]=s.split(':').map(Number);return(h||0)+(m||0)/60;}
+  const n=parseFloat(s);return isNaN(n)?0:n;
+}
+function toHHMM(h){const hrs=Math.floor(h),mins=Math.round((h-hrs)*60);return`${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function markDirty(){
+  if(!allRecords.length)return;const n=document.getElementById('recalc-note');n.textContent='⚠ Settings changed — click Re-generate';n.classList.add('dirty');autoSaveConfig();}
+
+// ════════════════════════════════════════════
+// ELIGIBILITY UI
+// ════════════════════════════════════════════
+function getAvailableCols(){
+  const used=new Set(eligFilters.map(f=>f.col));
+  return empColumns.filter(c=>{
+    if(EXCLUDED_COLS.has(c)||used.has(c))return false;
+    const uniq=new Set(empRows.map(r=>String(r[c]||'').trim()).filter(v=>v&&v!=='nan'&&v!=='undefined'));
+    return uniq.size>=1&&uniq.size<=80;
+  }).sort((a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+}
+function getColValues(col){
+  const vals=[...new Set(empRows.map(r=>String(r[col]||'').trim()).filter(v=>v&&v!=='nan'&&v!=='undefined'))];
+  const allNum=vals.every(v=>!isNaN(v)&&v!=='');
+  return vals.sort(allNum?(a,b)=>parseFloat(a)-parseFloat(b):(a,b)=>a.localeCompare(b,undefined,{sensitivity:'base'}));
+}
+function renderEligFilters(){
+  document.getElementById('elig-filters').innerHTML=eligFilters.map((f,fi)=>{
+    const allVals=getColValues(f.col);
+    const remaining=allVals.filter(v=>!f.values.includes(v));
+    return`<div class="filter-card">
+      <div class="filter-card-head">
+        <select onchange="changeFilterCol(${fi},this.value)">
+          ${[f.col,...getAvailableCols()].map(c=>`<option value="${esc(c)}" ${c===f.col?'selected':''}>${c}</option>`).join('')}
+        </select>
+        <button class="rm-filter-btn" onclick="removeFilter(${fi})">×</button>
+      </div>
+      <div class="values-area">
+        ${f.values.length===0?`<span class="no-vals-hint">No values — all pass</span>`
+          :f.values.map((v,vi)=>`<span class="val-chip">${esc(v)}<button onclick="removeVal(${fi},${vi})">×</button></span>`).join('')}
+      </div>
+      ${remaining.length>0?`<select class="val-add-select" onchange="addVal(${fi},this.value);this.selectedIndex=0;">
+        <option value="">+ Add value…</option>
+        <option value="__ALL__">✓ Select all</option>
+        ${remaining.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}
+      </select>`:''}
+    </div>`;
+  }).join('');
+  document.getElementById('add-filter-btn').disabled=empColumns.length===0||getAvailableCols().length===0;
+}
+function addFilter(){const a=getAvailableCols();if(!a.length)return;const col=a[0];eligFilters.push({col,values:[...getColValues(col)]});renderEligFilters();}
+function removeFilter(fi){eligFilters.splice(fi,1);renderEligFilters();}
+function changeFilterCol(fi,col){eligFilters[fi]={col,values:[...getColValues(col)]};renderEligFilters();}
+function addVal(fi,val){
+  if(!val)return;
+  if(val==='__ALL__'){getColValues(eligFilters[fi].col).forEach(v=>{if(!eligFilters[fi].values.includes(v))eligFilters[fi].values.push(v);});}
+  else{if(!eligFilters[fi].values.includes(val))eligFilters[fi].values.push(val);}
+  renderEligFilters();
+}
+function removeVal(fi,vi){eligFilters[fi].values.splice(vi,1);renderEligFilters();}
+
+// ════════════════════════════════════════════
+// FILE HANDLING
+// ════════════════════════════════════════════
+function dz(e,type,over){e.preventDefault();document.getElementById('dz-'+type).classList.toggle('dragover',over);}
+function drop(e,type){e.preventDefault();dz(e,type,false);const f=e.dataTransfer.files[0];if(f)storeFile(type,f);}
+function fileChosen(e,type){const f=e.target.files[0];if(f)storeFile(type,f);}
+async function storeFile(type,f){
+  if(type==='emp'){
+    try{
+      const wb=await readWb(f);
+      empRows=wbRows(wb);
+      const empErr=validateEmpFile(empRows);
+      if(empErr){
+        showToast(empErr,'error',9000);
+        const dze=document.getElementById('dz-emp');
+        dze.classList.add('dz-error');
+        setTimeout(()=>dze.classList.remove('dz-error'),500);
+        const fi=document.getElementById('fi-emp');if(fi)fi.value='';
+        empRows=[];return;
+      }
+      empFile=f;
+      document.getElementById('fn-emp').textContent=f.name;
+      document.getElementById('dz-emp').classList.add('loaded');
+      empColumns=empRows.length?Object.keys(empRows[0]):[];
+      document.getElementById('add-filter-btn').disabled=false;
+      renderEligFilters();
+      showToast('Employee file loaded — '+empRows.length+' employees found.','success',3000);
+    }catch(e){showToast('Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Employee List Report, then try again.','error',6000);const dze=document.getElementById('dz-emp');dze.classList.add('dz-error');setTimeout(()=>dze.classList.remove('dz-error'),500);const fie=document.getElementById('fi-emp');if(fie)fie.value='';}
+  } else if(type==='att'){
+    try{
+      const wb=await readWb(f);
+      const attErr=validateAttFile(wb);
+      if(attErr){
+        showToast(attErr,'error',9000);
+        const dze=document.getElementById('dz-att');
+        dze.classList.add('dz-error');
+        setTimeout(()=>dze.classList.remove('dz-error'),500);
+        const fi=document.getElementById('fi-att');if(fi)fi.value='';
+        return;
+      }
+      attFile=f;
+      document.getElementById('fn-att').textContent=f.name;
+      document.getElementById('dz-att').classList.add('loaded');
+      attColumns=OT_COLUMNS;
+      renderAllowanceTypes();
+      showToast('Attendance file loaded.','success',3000);
+    }catch(e){showToast('Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Attendance Report, then try again.','error',6000);const dza=document.getElementById('dz-att');dza.classList.add('dz-error');setTimeout(()=>dza.classList.remove('dz-error'),500);const fia=document.getElementById('fi-att');if(fia)fia.value='';}
+  } else if(type==='adj'){
+    try{
+      const wb=await readWb(f);
+      if(!wb.SheetNames.includes('ProcessPayrollImportAdjustment')){
+        showToast('Heads up! This doesn\'t look like the correct Adjustment Template. Head to Sprout Payroll → Payroll → Upload Adjustment → Download Excel Template, then upload that file here.','error',9000);
+        const dze=document.getElementById('dz-adj');
+        dze.classList.add('dz-error');
+        setTimeout(()=>dze.classList.remove('dz-error'),500);
+        const fi=document.getElementById('fi-adj');if(fi)fi.value='';
+        return;
+      }
+      adjFile=f;
+      document.getElementById('fn-adj').textContent=f.name;
+      document.getElementById('dz-adj').classList.add('loaded');
+      showToast('Adjustment Template loaded.','success',3000);
+    }catch(e){
+      showToast('Heads up! Could not read this file. Download the template from Sprout Payroll → Payroll → Upload Adjustment → Download Excel Template, then try again.','error',9000);
+      const dze=document.getElementById('dz-adj');
+      dze.classList.add('dz-error');
+      setTimeout(()=>dze.classList.remove('dz-error'),500);
+      const fi=document.getElementById('fi-adj');if(fi)fi.value='';
+    }
+    return;
+  }
+  const ready=empFile&&attFile;
+  document.getElementById('run-btn').disabled=!ready;
+  document.getElementById('recalc-note').textContent=ready?'Click Generate to build the report':'Upload both files to generate';
+}
+function removeFile(e,type){
+  e.stopPropagation();e.preventDefault();
+  if(type==='emp'){
+    empFile=null;empRows=[];empColumns=[];eligFilters=[];renderEligFilters();
+    document.getElementById('add-filter-btn').disabled=true;
+  } else if(type==='att'){
+    attFile=null;attColumns=OT_COLUMNS;renderAllowanceTypes();
+  } else if(type==='adj'){
+    adjFile=null;
+    document.getElementById('fn-adj').textContent='';
+    document.getElementById('dz-adj').classList.remove('loaded');
+    const fa=document.getElementById('fi-adj');if(fa)fa.value='';
+    return;
+  }
+  document.getElementById('fn-'+type).textContent='';
+  document.getElementById('dz-'+type).classList.remove('loaded');
+  const fi=document.getElementById('fi-'+type);if(fi)fi.value='';
+  const ready=empFile&&attFile;
+  document.getElementById('run-btn').disabled=!ready;
+  document.getElementById('recalc-note').textContent=ready?'Click Generate to build the report':'Upload both files to generate';
+}
+
+// ════════════════════════════════════════════
+// EXCEL UTILS
+// ════════════════════════════════════════════
+function readWb(file){return new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>{try{res(XLSX.read(e.target.result,{type:'array'}));}catch(err){rej(err);}};r.onerror=rej;r.readAsArrayBuffer(file);});}
+function wbRows(wb){return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''});}
+function findCol(row,cands){const keys=Object.keys(row);for(const c of cands){const f=keys.find(k=>k.trim().toLowerCase()===c.toLowerCase());if(f!==undefined)return f;}for(const c of cands){const f=keys.find(k=>k.trim().toLowerCase().includes(c.toLowerCase()));if(f!==undefined)return f;}return null;}
+
+// ════════════════════════════════════════════
+// MAIN PROCESS
+// ════════════════════════════════════════════
+async function processFiles(){
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true;btn.textContent='Processing…';
+  showLoading('Reading files...');
+  try{
+    const attWb=await readWb(attFile);
+    // Validate attendance file
+
+    const sumWs=attWb.Sheets['Summary']||attWb.Sheets[attWb.SheetNames[0]];
+    const sumRows=sumWs?XLSX.utils.sheet_to_json(sumWs,{defval:''}):[];
+    const sumIdCol=sumRows.length?findCol(sumRows[0],['ID No','Employee ID','EmpID','ID']):null;
+    const sumMap={};
+    for(const row of sumRows){const id=String(row[sumIdCol]||'').trim();if(id)sumMap[id]=row;}
+
+    // Parse Detailed sheet → per-day OT per allowance type → daily allowance
+    const detWs=attWb.Sheets['Detailed']||attWb.Sheets[attWb.SheetNames[1]];
+    const detRaw=detWs?XLSX.utils.sheet_to_json(detWs,{header:1,defval:''}):[];
+    const detDayMap={}; // empId → [{date,day,shift,totalOT,byType,allowByType,dayAllow}]
+    let curId=null,inData=false;
+    let detColMap={}; // column name → index
+
+    for(const row of detRaw){
+      const c0=String(row[0]||'').trim();
+      const c1=String(row[1]||'').trim();
+      if(c0==='ID Number:'){curId=c1;inData=false;detDayMap[curId]=[];continue;}
+      if(c0==='Date'&&String(row[7]||'').trim()==='Total OT'){
+        inData=true;
+        // Build column name → index map
+        detColMap={};
+        row.forEach((v,idx)=>{if(v)detColMap[String(v).trim()]=idx;});
+        continue;
+      }
+      if(!inData||!curId)continue;
+      const dateVal=String(row[0]||'').trim();
+      if(!dateVal||dateVal.toLowerCase()==='nan')continue;
+      const totalOT=parseHours(row[7]); // Total OT col
+      if(totalOT<=0)continue;
+      const shift=String(row[3]||'').trim();
+      const shiftType=classifyShift(shift);
+      const biologsIdx=detColMap['Biologs'];
+      const biologs=biologsIdx!==undefined?String(row[biologsIdx]||'').trim():'';
+
+      // For each allowance type, sum its cols — only if this day's shiftType is in at.shiftTypes
+      const byType={},allowByType={};
+      for(const at of allowanceTypes){
+        const applies=(at.shiftTypes||[]).includes(shiftType);
+        const typeOT=applies?at.cols.reduce((s,c)=>{
+          const idx=detColMap[c];
+          return s+(idx!==undefined?parseHours(row[idx]):0);
+        },0):0;
+        byType[at.id]=typeOT;
+        allowByType[at.id]=calcAllow(typeOT,at.brackets);
+      }
+      const dayAllow=Object.values(allowByType).reduce((a,b)=>a+b,0);
+
+      detDayMap[curId].push({
+        date:dateVal,
+        day:String(row[1]||''),
+        shift,shiftType,biologs,
+        totalOT,byType,allowByType,dayAllow,
+      });
+    }
+
+    if(!empRows.length){const empWb=await readWb(empFile);empRows=wbRows(empWb);empColumns=empRows.length?Object.keys(empRows[0]):[];}
+    if(!empRows.length)throw new Error('Employee file appears empty.');
+
+
+    const smp=empRows[0];
+    const idCol    =findCol(smp,['Employee ID','EmployeeID','Emp ID','ID No','ID']);
+    const lnCol    =findCol(smp,['Last Name','LastName','Surname']);
+    const fnCol    =findCol(smp,['First Name','FirstName','Given Name']);
+    const deptCol  =findCol(smp,['Department','Dept']);
+    const posCol   =findCol(smp,['Position','Job Title','Designation']);
+    const gradeCol =findCol(smp,['Job Grade','JobGrade','Job Level','JobLevel','Level','Grade']);
+    const statusCol=findCol(smp,['Employee Status','EmpStatus','Status','Employment Status']);
+
+    const eligible=empRows.filter(r=>{
+      for(const f of eligFilters){if(!f.values.length)continue;const v=String(r[f.col]||'').trim();if(!f.values.includes(v))return false;}
+      return true;
+    });
+    if(!eligible.length){show('state-empty');hide('state-placeholder');hide('results-section');return;}
+
+    showLoading('Computing allowances...');
+    document.getElementById('period-label').textContent='📅 '+attFile.name.replace(/\.[^.]+$/,'').replace(/_/g,' ');
+
+    allRecords=eligible.map(emp=>{
+      const empId=String(emp[idCol]||'').trim();
+      const sumRow=sumMap[empId]||{};
+      const days=detDayMap[empId]||[];
+
+      // Aggregate per-type OT totals + raw Total OT from col 7
+      const totalOTByType={},totalAllowByType={};
+      for(const at of allowanceTypes){totalOTByType[at.id]=0;totalAllowByType[at.id]=0;}
+      let totalOTRaw=0; // sum of Total OT col (col 7) — bracket reference for accum/shifttype
+      const shiftRawTotals={Regular:0,'Rest Day':0,Holiday:0}; // raw Total OT grouped by shift type
+      for(const d of days){
+        for(const at of allowanceTypes){
+          totalOTByType[at.id]+=(d.byType[at.id]||0);
+        }
+        totalOTRaw+=d.totalOT;
+        const st=d.shiftType||'Regular';
+        if(shiftRawTotals[st]!==undefined) shiftRawTotals[st]+=d.totalOT;
+      }
+      const totalOT=Object.values(totalOTByType).reduce((a,b)=>a+b,0);
+
+      if(computeMode==='accumulated'){
+        // Accumulated: Total OT (col 7) for the period → bracket once per type
+        for(const at of allowanceTypes){
+          totalAllowByType[at.id]=totalOTRaw>0 ? calcAllow(totalOTRaw,at.brackets) : 0;
+        }
+      } else if(computeMode==='shifttype'){
+        // Per Shift Type: Total OT (col 7) grouped by shift type → each group → bracket → sum
+        // Only include shift types that the allowance type applies to
+        for(const at of allowanceTypes){
+          totalAllowByType[at.id]=Object.entries(shiftRawTotals)
+            .filter(([st])=>(at.shiftTypes||[]).includes(st))
+            .reduce((s,[,hrs])=>s+calcAllow(hrs,at.brackets),0);
+        }
+      } else {
+        // Per Day: sum daily allowances
+        for(const d of days){
+          for(const at of allowanceTypes){
+            totalAllowByType[at.id]+=(d.allowByType[at.id]||0);
+          }
+        }
+      }
+      const totalAllow=Object.values(totalAllowByType).reduce((a,b)=>a+b,0);
+
+      return{
+        employee_id:empId,
+        name:`${emp[fnCol]||''} ${emp[lnCol]||''}`.trim(),
+        department:String(emp[deptCol]||'—'),
+        position:String(emp[posCol]||'—'),
+        job_grade:gradeCol?parseFloat(emp[gradeCol]):0,
+        status:String(emp[statusCol]||'—'),
+        days_present:parseInt(sumRow['Days Present']||0)||0,
+        days:detDayMap[empId]||[],
+        shiftRawTotals,
+        totalOTByType,totalAllowByType,totalOT,totalOTRaw,totalAllow,
+      };
+    });
+
+    buildTableHeaders();
+    populateTableFilters();
+    hide('state-placeholder');hide('state-empty');show('results-section');
+    updateStats();renderTable();
+    const n=document.getElementById('recalc-note');n.textContent='Adjust settings and Re-generate to update';n.classList.remove('dirty');
+
+  }catch(err){showToast('Error: '+err.message,'error',8000);}
+  finally{btn.disabled=false;btn.textContent='Re-generate Report';hideLoading();}
+}
+
+function show(id){document.getElementById(id).style.display='';}
+function hide(id){document.getElementById(id).style.display='none';}
+
+// ════════════════════════════════════════════
+// TABLE
+// ════════════════════════════════════════════
+function buildTableHeaders(){
+  const colspan=2+allowanceTypes.length*2;
+  document.getElementById('main-thead').innerHTML=`
+    <tr>
+      <th rowspan="2"></th>
+      <th rowspan="2" style="cursor:pointer;user-select:none" onclick="sortBy('name')">Employee <span id="sort-ind" style="font-size:9px">↕</span></th>
+      <th rowspan="2">Department</th>
+      <th rowspan="2">Position</th>
+      <th rowspan="2">Grade</th>
+      <th rowspan="2">Status</th>
+      <th rowspan="2" class="num">Days Present</th>
+      ${allowanceTypes.map(at=>`<th colspan="2" class="num grp-header" style="border-top-color:${at.color};color:${at.color}">${esc(at.name)}</th>`).join('')}
+      <th colspan="2" class="num grp-header" style="border-top-color:var(--border)">Total</th>
+    </tr>
+    <tr>
+      ${allowanceTypes.map(at=>`<th class="num" style="color:${at.color}">OT (HH:MM)</th><th class="num" style="color:${at.color}">Allowance</th>`).join('')}
+      <th class="num">Total OT</th><th class="num">Allowance</th>
+    </tr>`;
+}
+
+function populateTableFilters(){
+  const depts=[...new Set(allRecords.map(r=>r.department).filter(d=>d&&d!=='—'))].sort();
+  const stats=[...new Set(allRecords.map(r=>r.status).filter(s=>s&&s!=='—'))].sort();
+  document.getElementById('dept-filter').innerHTML='<option value="">All Departments</option>'+depts.map(d=>`<option>${d}</option>`).join('');
+  document.getElementById('status-filter').innerHTML='<option value="">All Statuses</option>'+stats.map(s=>`<option>${s}</option>`).join('');
+}
+
+function updateStats(){
+  const totAllow=allRecords.reduce((s,r)=>s+r.totalAllow,0);
+  document.getElementById('s-eligible').textContent=allRecords.length;
+  document.getElementById('s-with-ot').textContent=allRecords.filter(r=>r.totalAllow>0).length;
+  document.getElementById('s-ot-days').textContent=toHHMM(allRecords.reduce((s,r)=>s+r.totalOT,0));
+  document.getElementById('s-total-allow').textContent='₱'+totAllow.toLocaleString();
+}
+
+function getFiltered(){
+  const search=document.getElementById('search').value.toLowerCase();
+  const dept=document.getElementById('dept-filter').value;
+  const status=document.getElementById('status-filter').value;
+  const otF=document.getElementById('ot-filter').value;
+  const hideZero=document.getElementById('hide-zero')&&document.getElementById('hide-zero').checked;
+  return allRecords.filter(r=>{
+    if(search&&!r.name.toLowerCase().includes(search)&&!r.employee_id.toLowerCase().includes(search))return false;
+    if(dept&&r.department!==dept)return false;
+    if(status&&r.status!==status)return false;
+    if(otF==='has_ot'&&r.totalAllow===0)return false;
+    if(otF==='no_ot'&&r.totalAllow>0)return false;
+    if(hideZero&&r.totalAllow===0)return false;
+    return true;
+  });
+}
+
+
+function sortBy(field){
+  if(sortField===field)sortDir=sortDir==='asc'?'desc':'asc';
+  else{sortField=field;sortDir='asc';}
+  renderTable();
+}
+function getSorted(rows){
+  return [...rows].sort((a,b)=>{
+    let va=a[sortField]||'', vb=b[sortField]||'';
+    if(typeof va==='number')return sortDir==='asc'?va-vb:vb-va;
+    return sortDir==='asc'?String(va).localeCompare(String(vb)):String(vb).localeCompare(String(va));
+  });
+}
+
+function renderTable(){
+  const rows=getSorted(getFiltered());
+  const ind=document.getElementById('sort-ind');
+  if(ind)ind.textContent=sortField==='name'?(sortDir==='asc'?'↑':'↓'):'↕';
+  const noRes=document.getElementById('no-results');
+  const tbody=document.getElementById('tbody');
+  if(!rows.length){tbody.innerHTML='';noRes.style.display='block';return;}
+  noRes.style.display='none';
+
+  tbody.innerHTML=rows.map((r,ri)=>{
+    const sc=r.status.toLowerCase().includes('regular')?'s-reg':r.status.toLowerCase().includes('probat')?'s-pro':'s-oth';
+
+    const typeCells=allowanceTypes.map(at=>{
+      const ot=r.totalOTByType[at.id]||0;
+      const allow=r.totalAllowByType[at.id]||0;
+      const hasOT=ot>0;
+      return`<td class="num"><span style="${hasOT?'color:'+at.color+';font-weight:600':'color:var(--muted)'}">${hasOT?toHHMM(ot):'—'}</span></td>
+      <td class="num">${allow>0?`<span class="allow-val" style="color:${at.color}">₱${allow.toLocaleString()}</span>`:`<span class="allow-zero">₱0</span>`}</td>`;
+    }).join('');
+
+    // Per-day OT rows from Detailed sheet
+    const dayRows=r.days.length
+      ? r.days.map(d=>{
+          const typeBreakdown=allowanceTypes
+            .filter(at=>(d.byType[at.id]||0)>0)
+            .map(at=>`<span style="font-family:'DM Mono',monospace;font-size:9px;font-weight:600;color:${at.color};margin-right:12px">${toHHMM(d.byType[at.id])}&nbsp;<span style="font-weight:400;color:var(--muted)">${esc(at.name)}</span>&nbsp;→&nbsp;₱${(d.allowByType[at.id]||0).toLocaleString()}</span>`)
+            .join('');
+          return`<tr class="${d.dayAllow>0&&computeMode==='perday'?'has-allow':''}">
+            <td>${d.date}</td>
+            <td>${d.day}</td>
+            <td style="max-width:200px;font-size:9px;">
+              <div style="color:var(--muted)">${esc(d.shift)}</div>
+              <div style="margin-top:2px;color:${d.biologs&&d.biologs.toUpperCase()!=='NO LOGS'?'var(--accent)':'#dc2626'};font-weight:600">${esc(d.biologs||'NO LOGS')}</div>
+            </td>
+            <td style="font-size:9px">${computeMode==='perday'?(typeBreakdown||'<span style="color:var(--muted)">—</span>'):computeMode==='shifttype'?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:${d.shiftType==='Regular'?'#16a34a':d.shiftType==='Rest Day'?'#ca8a04':'#dc2626'};font-weight:600">${toHHMM(d.totalOT)} <span style="font-weight:400;color:var(--muted)">${d.shiftType||'Regular'}</span></span>`:`<span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent2)">${toHHMM(d.totalOT)} OT rendered</span>`}</td>
+            ${computeMode==='perday'?`<td class="r">${d.dayAllow>0?'<span style="font-family:\'DM Mono\',monospace;font-weight:700;color:var(--accent)">₱'+d.dayAllow.toLocaleString()+'</span>':'<span style="color:var(--muted)">₱0</span>'}</td>`:'<td class="r" style="color:var(--muted);font-style:italic;font-size:9px">—</td>'}
+          </tr>`;
+        }).join('')
+      : `<tr><td colspan="5" style="color:var(--muted);font-style:italic;padding:8px">No OT hours found</td></tr>`;
+
+    // Allowance summary by type
+    const allowRows=allowanceTypes.map(at=>{
+      const ot=r.totalOTByType[at.id]||0;
+      const allow=r.totalAllowByType[at.id]||0;
+      if(ot===0&&allow===0)return'';
+      return`<tr class="${allow>0?'has-allow':''}">
+        <td><span style="font-weight:600;color:${at.color}">${esc(at.name)}</span></td>
+        <td class="r">${toHHMM(ot)}</td>
+        <td class="r">${allow>0?`<span class="allow-val" style="color:${at.color}">₱${allow.toLocaleString()}</span>`:`<span style="color:var(--muted)">₱0</span>`}</td>
+        <td style="font-size:9px;color:var(--muted)">${bracketLabel(ot,at.brackets)}</td>
+      </tr>`;
+    }).join('')||`<tr><td colspan="4" style="color:var(--muted);font-style:italic">No allowance</td></tr>`;
+
+    const totalTypeCols=2+allowanceTypes.length*2;
+    const summaryRow=`<tr class="summary-row" onclick="toggleDetail(${ri})">
+      <td><button class="toggle-btn" id="toggle-${ri}">▶</button></td>
+      <td><div class="emp-name">${r.name}</div><div class="emp-id">${r.employee_id}</div></td>
+      <td>${r.department}</td><td>${r.position}</td>
+      <td><span class="grade-badge">L${r.job_grade}</span></td>
+      <td><span class="status-badge ${sc}">${r.status}</span></td>
+      <td class="num">${r.days_present}</td>
+      ${typeCells}
+      <td class="num"><span style="${r.totalOT>0?'font-weight:600':'color:var(--muted)'}">${r.totalOT>0?toHHMM(r.totalOT):'—'}</span></td>
+      <td class="num"><span class="allow-val" style="${r.totalAllow===0?'color:var(--muted);font-weight:400':'color:var(--accent)'}">₱${r.totalAllow.toLocaleString()}</span></td>
+    </tr>`;
+
+    const detailRow=`<tr class="detail-row" id="detail-${ri}">
+      <td colspan="${totalTypeCols+7}">
+        <div class="detail-inner">
+
+          <div class="detail-title">OT Days · ${r.name}</div>
+          <table class="day-table" style="margin-bottom:14px">
+            <thead><tr>
+              <th>Date</th><th>Day</th><th>Shift / Actual Logs</th><th>Breakdown</th><th class="r">Day Allow</th>
+            </tr></thead>
+            <tbody>${dayRows}</tbody>
+          </table>
+
+          <div class="detail-total">
+            <span><span class="detail-total-label">OT Days: </span><span class="detail-total-val">${r.days.length}</span></span>
+            <span><span class="detail-total-label">Total OT: </span><span class="detail-total-val">${toHHMM(r.totalOT)}</span></span>
+            ${computeMode==='shifttype'?`
+              ${['Regular','Rest Day','Holiday'].map(st=>{
+                const hrs=(r.shiftRawTotals||{})[st]||0;
+                if(hrs<=0)return'';
+                const color=st==='Regular'?'#16a34a':st==='Rest Day'?'#ca8a04':'#dc2626';
+                const stAllow=allowanceTypes.reduce((s,at)=>{
+                  if(!(at.shiftTypes||[]).includes(st))return s;
+                  return s+calcAllow(hrs,at.brackets);
+                },0);
+                if(stAllow<=0)return'';
+                return`<span><span class="detail-total-label">${st}: </span><span class="detail-total-val" style="color:${color}">${toHHMM(hrs)} → ₱${stAllow.toLocaleString()}</span></span>`;
+              }).join('')}`:''}
+            <span><span class="detail-total-label">Total Allowance: </span><span class="detail-total-val">₱${r.totalAllow.toLocaleString()}</span></span>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+
+    return summaryRow+detailRow;
+  }).join('');
+}
+
+function toggleDetail(ri){
+  const det=document.getElementById('detail-'+ri);
+  const btn=document.getElementById('toggle-'+ri);
+  const isOpen=det.classList.contains('open');
+  det.classList.toggle('open',!isOpen);
+  btn.classList.toggle('open',!isOpen);
+}
+
+// ════════════════════════════════════════════
+// EXPORT EXCEL
+// ════════════════════════════════════════════
+function exportExcel(){
+  const rows=getSorted(getFiltered());
+  const ind=document.getElementById('sort-ind');
+  if(ind)ind.textContent=sortField==='name'?(sortDir==='asc'?'↑':'↓'):'↕';
+  const headers=['Employee ID','Name','Department','Position','Job Grade','Status','Days Present',
+    ...allowanceTypes.flatMap(at=>[`${at.name} OT (HH:MM)`,`${at.name} Allow (₱)`]),
+    'Total OT (HH:MM)','Total Allow (₱)'];
+
+  const PESO='₱#,##0.00';
+
+  // Build worksheet manually to apply cell formats
+  const period=document.getElementById('period-label').textContent.replace('📅 ','').trim();
+  const generated=new Date().toLocaleString();
+
+  const coverageRows=[
+    ['Allowance Report'],
+    ['Period:', period],
+    ['Generated:', generated],
+    [],
+  ];
+
+  const wb=XLSX.utils.book_new();
+  const wsData=[...coverageRows, headers];
+
+  rows.forEach(r=>{
+    wsData.push([
+      r.employee_id,r.name,r.department,r.position,r.job_grade,r.status,r.days_present,
+      ...allowanceTypes.flatMap(at=>[toHHMM(r.totalOTByType[at.id]||0),r.totalAllowByType[at.id]||0]),
+      toHHMM(r.totalOT),r.totalAllow
+    ]);
+  });
+
+  // Totals row
+  wsData.push(['TOTAL','','','','','','',
+    ...allowanceTypes.flatMap(at=>['',rows.reduce((s,r)=>s+(r.totalAllowByType[at.id]||0),0)]),
+    '',rows.reduce((s,r)=>s+r.totalAllow,0),
+  ]);
+
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+
+  // Apply peso format to allowance columns
+  // Coverage rows = 4 (title, period, generated, blank), header = row 4, data starts at row 5
+  const headerRowIdx=coverageRows.length;
+  const totalRows=wsData.length;
+  allowanceTypes.forEach((at,ai)=>{
+    const colIdx=7 + ai*2 + 1;
+    for(let r=headerRowIdx+1;r<totalRows;r++){
+      const addr=XLSX.utils.encode_cell({r,c:colIdx});
+      if(ws[addr]&&ws[addr].t==='n') ws[addr].z=PESO;
+    }
+  });
+  const totalAllowCol=7+allowanceTypes.length*2+1;
+  for(let r=headerRowIdx+1;r<totalRows;r++){
+    const addr=XLSX.utils.encode_cell({r,c:totalAllowCol});
+    if(ws[addr]&&ws[addr].t==='n') ws[addr].z=PESO;
+  }
+
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:headerRowIdx,c:0},e:{r:totalRows-2,c:headers.length-1}})};
+  XLSX.utils.book_append_sheet(wb,ws,'Allowance Summary');
+  XLSX.writeFile(wb,'Allowance_Report_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  logExport('Excel Summary', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+}
+
+
+// ════════════════════════════════════════════
+// EXPORT ADJUSTMENT TEMPLATE
+// ════════════════════════════════════════════
+function exportAdjustment(){
+  const rows=getFiltered();
+  if(!rows.length){showToast('No employees with allowance data to export.','warning',4000);return;}
+
+  // If user uploaded a fresh Payrollpie template, use it (fill in-place)
+  if(adjFile){
+    exportAdjustmentFromTemplate(rows,adjFile);
+  } else {
+    exportAdjustmentEmbedded(rows);
+  }
+}
+
+async function exportAdjustmentFromTemplate(rows,file){
+  const wb=await readWb(file);
+  const ws=wb.Sheets['ProcessPayrollImportAdjustment'];
+  if(!ws){showToast('Sheet "ProcessPayrollImportAdjustment" not found.','error');return;}
+
+  const DATA_FONT={name:'Calibri',sz:11};
+  const range=XLSX.utils.decode_range(ws['!ref']);
+
+  // Read all pre-filled rows from template (row 2 onwards)
+  const templateRows=[];
+  for(let r=2;r<=range.e.r;r++){
+    const rowData={};
+    for(let c=0;c<=range.e.c;c++){
+      const addr=XLSX.utils.encode_cell({r,c});
+      if(ws[addr])rowData[c]={...ws[addr]};
+    }
+    const statusCell=ws[XLSX.utils.encode_cell({r,c:0})];
+    const isSample=statusCell&&String(statusCell.v||'').includes('SAMPLE');
+    const idCell=ws[XLSX.utils.encode_cell({r,c:1})];
+    const empId=idCell&&idCell.v!==undefined?String(idCell.v).trim():'';
+    if(isSample){templateRows.push({empId,rowData,isSample:true});continue;}
+    templateRows.push({empId,rowData});
+  }
+
+  // Build lookup: which employees have allowances
+  const allowanceMap={};
+  for(const r of rows){
+    allowanceMap[r.employee_id.trim().toLowerCase()]=r;
+  }
+
+  const mf=getAdjModalFields();
+  let filled=0,missed=[];
+
+  // Separate into two groups: with data, without data
+  const withData=[], withoutData=[];
+  for(const tr of templateRows.filter(t=>!t.isSample)){
+    const key=tr.empId.toLowerCase();
+    const r=allowanceMap[key];
+    if(r&&r.totalAllow>0){
+      // Fill allowance data into row
+      const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
+        .map(at=>at.name+': '+toHHMM(r.totalOTByType[at.id]||0)).join(' | ');
+      tr.rowData[3]={t:'s',v:mf.adjType,s:{font:DATA_FONT}};
+      tr.rowData[4]={t:'s',v:mf.adjName,s:{font:DATA_FONT}};
+      tr.rowData[5]={t:'s',v:mf.adjCode,s:{font:DATA_FONT}};
+      tr.rowData[6]={t:'n',v:r.totalAllow,s:{font:DATA_FONT}};
+      tr.rowData[7]={t:'s',v:remarks,s:{font:DATA_FONT}};
+      tr.rowData[8]={t:'s',v:mf.beforeTax,s:{font:DATA_FONT}};
+      tr.rowData[9]={t:'s',v:mf.taxable,s:{font:DATA_FONT}};
+      withData.push(tr);
+      filled++;
+    } else {
+      withoutData.push(tr);
+      if(tr.empId)missed.push(tr.empId);
+    }
+  }
+
+  if(filled===0){
+    showToast('No employees matched the template. Make sure you\'re using the correct payroll period template.','error',9000);
+    return;
+  }
+
+  // Clear all data rows in worksheet
+  for(let r=2;r<=range.e.r;r++){
+    for(let c=0;c<=range.e.c;c++){
+      const addr=XLSX.utils.encode_cell({r,c});
+      if(ws[addr])delete ws[addr];
+    }
+  }
+
+  // Write: with data first, then without data (unless hiding zero/no-data employees)
+  const hideZero=document.getElementById('hide-zero')&&document.getElementById('hide-zero').checked;
+  let rowIdx=2;
+  const sampleRows=templateRows.filter(t=>t.isSample);
+  const rowsToWrite=hideZero?[...sampleRows,...withData]:[...sampleRows,...withData,...withoutData];
+  for(const tr of rowsToWrite){
+    for(const [c,cell] of Object.entries(tr.rowData)){
+      const addr=XLSX.utils.encode_cell({r:rowIdx,c:parseInt(c)});
+      ws[addr]={...cell};
+    }
+    rowIdx++;
+  }
+
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:range.e.c}});
+  XLSX.writeFile(wb,'AdjustmentTemplate_OTAllowance_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
+  logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+  showToast(hideZero
+    ? filled+' employee(s) with allowance exported. '+withoutData.length+' without data excluded.'
+    : filled+' employee(s) with allowance exported. '+withoutData.length+' without data grouped below.','success',6000);
+}
+
+function exportAdjustmentEmbedded(rows){
+  const ADJ_B64='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';
+  const bStr=atob(ADJ_B64);
+  const bytes=new Uint8Array(bStr.length);
+  for(let i=0;i<bStr.length;i++) bytes[i]=bStr.charCodeAt(i);
+
+  const wb=XLSX.read(bytes.buffer,{type:'array',cellStyles:true});
+  const ws=wb.Sheets['ProcessPayrollImportAdjustment'];
+
+  // Clear from row 3 onwards (keep title row 1 and header row 2)
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  for(let r=2;r<=range.e.r;r++){
+    for(let c=0;c<=range.e.c;c++){
+      const addr=XLSX.utils.encode_cell({r,c});
+      if(ws[addr])delete ws[addr];
+    }
+  }
+
+  const DATA_FONT={name:'Calibri',sz:11};
+  let rowIdx=2; // row 3 (0-indexed)
+
+  for(const r of rows){
+    const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
+      .map(at=>`${at.name}: ${toHHMM(r.totalOTByType[at.id]||0)}`).join(' | ');
+    [
+      {c:0,v:'',t:'s',s:{font:DATA_FONT}},
+      {c:1,v:r.employee_id,t:'s',s:{font:DATA_FONT}},
+      {c:2,v:r.name,t:'s',s:{font:DATA_FONT}},
+      {c:3,v:getAdjModalFields().adjType,t:'s',s:{font:DATA_FONT}},
+      {c:4,v:getAdjModalFields().adjName,t:'s',s:{font:DATA_FONT}},
+      {c:5,v:getAdjModalFields().adjCode,t:'s',s:{font:DATA_FONT}},
+      {c:6,v:r.totalAllow,t:'n',s:{font:DATA_FONT,numFmt:'#,##0.00'}},
+      {c:7,v:remarks,t:'s',s:{font:DATA_FONT}},
+      {c:8,v:getAdjModalFields().beforeTax,t:'s',s:{font:DATA_FONT}},
+      {c:9,v:getAdjModalFields().taxable,t:'s',s:{font:DATA_FONT}},
+    ].forEach(({c,v,t,s})=>{
+      const addr=XLSX.utils.encode_cell({r:rowIdx,c});
+      ws[addr]={t,v,s};
+    });
+    rowIdx++;
+  }
+
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:9}});
+  XLSX.writeFile(wb,'AdjustmentTemplate_OTAllowance_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
+  logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+}
+
+// ════════════════════════════════════════════
+// EXPORT PAYROLL INSTRUCTION (CIS template)
+// ════════════════════════════════════════════
+function exportPayroll(){
+  const rows=getFiltered();
+  if(!rows.length){showToast('No employees with allowance data to export.','warning',4000);return;}
+
+  const CIS_B64='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';
+  const bStr=atob(CIS_B64);
+  const bytes=new Uint8Array(bStr.length);
+  for(let i=0;i<bStr.length;i++) bytes[i]=bStr.charCodeAt(i);
+
+  const wb=XLSX.read(bytes.buffer,{type:'array',cellStyles:true});
+  const ws=wb.Sheets['Adjustments'];
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  const OT_DATA_START=2;
+  for(let r=OT_DATA_START;r<=range.e.r;r++){
+    for(let c=0;c<=range.e.c;c++){const addr=XLSX.utils.encode_cell({r,c});if(ws[addr])delete ws[addr];}
+  }
+
+  const DATA_FONT={name:'Calibri',sz:11};
+  let rowIdx=OT_DATA_START,seq=1;
+  for(const r of rows){
+    const breakdown=allowanceTypes.filter(at=>(r.totalAllowByType[at.id]||0)>0)
+      .map(at=>`${at.name}: ${toHHMM(r.totalOTByType[at.id]||0)} → ₱${(r.totalAllowByType[at.id]||0).toLocaleString()}`).join(' | ');
+    [
+      {c:1,v:String(seq).padStart(3,'0'),t:'s',s:{font:DATA_FONT}},
+      {c:2,v:r.name,t:'s',s:{font:DATA_FONT}},
+      {c:3,v:'OT Allowance',t:'s',s:{font:DATA_FONT}},
+      {c:4,v:'Addition',t:'s',s:{font:DATA_FONT}},
+      {c:5,v:r.totalAllow,t:'n',s:{font:DATA_FONT,numFmt:'#,##0.00'}},
+      {c:9,v:breakdown,t:'s',s:{font:DATA_FONT}},
+    ].forEach(({c,v,t,s})=>{const addr=XLSX.utils.encode_cell({r:rowIdx,c});ws[addr]={t,v,s};});
+    rowIdx++;seq++;
+  }
+  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:range.e.c}});
+  XLSX.writeFile(wb,'Allowance_Payroll_Instruction_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
+  logExport('Payroll Instruction', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+renderAllowanceTypes();
+autoLoadConfig();
+(function(){
+  const saved=localStorage.getItem('hr-theme');
+  if(saved==='light'){document.body.classList.add('light');const cb=document.getElementById('theme-toggle');if(cb)cb.checked=true;}
+})();
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ─── Tool Access Logging ───
+(function() {
+  var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8HHHyTdkqx-vh4nGT2ao3sxeX1yTygF-U7urREPeSyn23E6-zPZLtXozGGswihjvKEg/exec';
+  try {
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    if (sess.email && sess.device_id) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', SCRIPT_URL, true);
+      xhr.setRequestHeader('Content-Type', 'text/plain');
+      xhr.send(JSON.stringify({
+        action: 'log_tool_access',
+        email: sess.email,
+        device_id: sess.device_id,
+        tool: 'V1 - Bracket-Based'
+      }));
+    }
+  } catch(e) {}
+})();
+
+// ─── Export Logging ───
+function logExport(exportType, configSnapshot){
+  try {
+    var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8HHHyTdkqx-vh4nGT2ao3sxeX1yTygF-U7urREPeSyn23E6-zPZLtXozGGswihjvKEg/exec';
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    if (!sess.email || !sess.device_id) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', SCRIPT_URL, true);
+    xhr.setRequestHeader('Content-Type', 'text/plain');
+    xhr.send(JSON.stringify({
+      action: 'log_export',
+      email: sess.email,
+      device_id: sess.device_id,
+      tool: 'V1 - Bracket-Based',
+      export_type: exportType,
+      config_snapshot: JSON.stringify(configSnapshot||{})
+    }));
+  } catch(e) {}
+}
+
+
+// ─── Access Control ───
+(function() {
+  try {
+    var sess = JSON.parse(localStorage.getItem('ot-pin-session') || '{}');
+    var access = (sess.access || 'V1,V2').toUpperCase();
+    if (!sess.email || access.indexOf('V1') === -1) {
+      var denied = document.getElementById('access-denied');
+      if (denied) denied.classList.add('show');
+      var msg = document.getElementById('access-denied-msg');
+      if (msg && sess.email) msg.textContent = 'You don\'t have access to this tool. Contact your Customer Success Manager to request access.';
+      if (msg && !sess.email) msg.textContent = 'Please log in from the Hub first.';
+    }
+  } catch(e) {}
+})();
+
+</script>
+
+<footer class="app-footer">
+  <div class="footer-socials">
+    <span class="footer-brand">Sprout Solutions</span>
+    <a class="footer-social" href="https://www.facebook.com/SproutSolutionsPH" target="_blank" title="Facebook">
+      <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.instagram.com/sproutsolutionsph" target="_blank" title="Instagram">
+      <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.youtube.com/@SproutSolutionsPH" target="_blank" title="YouTube">
+      <svg viewBox="0 0 24 24"><path d="M23.495 6.205a3.007 3.007 0 00-2.088-2.088c-1.87-.501-9.396-.501-9.396-.501s-7.507-.01-9.396.501A3.007 3.007 0 00.527 6.205a31.247 31.247 0 00-.522 5.805 31.247 31.247 0 00.522 5.783 3.007 3.007 0 002.088 2.088c1.868.502 9.396.502 9.396.502s7.506 0 9.396-.502a3.007 3.007 0 002.088-2.088 31.247 31.247 0 00.5-5.783 31.247 31.247 0 00-.5-5.805zM9.609 15.601V8.408l6.264 3.602z"/></svg>
+    </a>
+    <a class="footer-social" href="https://www.linkedin.com/company/sprout-solutions" target="_blank" title="LinkedIn">
+      <svg viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+    </a>
+  </div>
+  
+</footer>
+</body>
+</html>
