@@ -75,7 +75,31 @@
   .elig-table tr.elig-primary td:first-child{font-weight:700;color:var(--accent3);}
   .elig-table tr.elig-group-label td{padding:6px 4px 3px;border-top:none;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
   .elig-table tr.elig-note-row td{padding:5px 4px 8px;border-top:none;font-size:8px;font-style:italic;color:var(--muted);line-height:1.5;}
-  .elig-table .info-icon{cursor:help;color:var(--accent2);font-size:11px;vertical-align:middle;}
+  .elig-table .info-icon{cursor:help;color:var(--accent2);font-size:11px;vertical-align:middle;position:relative;display:inline-block;}
+  .elig-table .info-icon::after{
+    content:attr(data-tooltip);
+    display:none;
+    position:absolute;
+    bottom:135%;
+    left:50%;
+    transform:translateX(-50%);
+    width:220px;
+    background:var(--surface);
+    color:var(--text);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:8px 10px;
+    font-size:9px;
+    font-style:normal;
+    font-weight:400;
+    line-height:1.5;
+    text-transform:none;
+    letter-spacing:normal;
+    box-shadow:0 8px 24px rgba(0,0,0,.35);
+    z-index:50;
+    white-space:normal;
+  }
+  .elig-table .info-icon:hover::after{display:block;}
 
   .emp-search{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:7px 10px;border-radius:7px;outline:none;margin-bottom:8px;}
   .emp-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
@@ -536,7 +560,7 @@ function renderEligTable(){
     }
     var saBelowTip = 'Only applies when hours worked fall at or below half the shift, with no leave or Schedule Adjustment on file. Working more than half the shift gets full allowance based on Onsite/WFH, even if it is still short of the complete shift.';
     var labelCell = (k==='sa_below')
-      ? '<td>'+label+' <span class="info-icon" title="'+saBelowTip+'">\u24d8</span></td>'
+      ? '<td>'+label+' <span class="info-icon" data-tooltip="'+saBelowTip+'">\u24d8</span></td>'
       : '<td>'+label+'</td>';
     html += '<tr'+(isPrimary?' class="elig-primary"':'')+'>' +
       labelCell +
