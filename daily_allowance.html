@@ -75,6 +75,7 @@
   .elig-table tr.elig-primary td:first-child{font-weight:700;color:var(--accent3);}
   .elig-table tr.elig-group-label td{padding:6px 4px 3px;border-top:none;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
   .elig-table tr.elig-note-row td{padding:5px 4px 8px;border-top:none;font-size:8px;font-style:italic;color:var(--muted);line-height:1.5;}
+  .elig-table .info-icon{cursor:help;color:var(--accent2);font-size:11px;vertical-align:middle;}
 
   .emp-search{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:11px;padding:7px 10px;border-radius:7px;outline:none;margin-bottom:8px;}
   .emp-list{max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
@@ -116,7 +117,7 @@
   .allow-val{font-family:'DM Mono',monospace;font-weight:700;}
   .allow-zero{color:var(--muted);}
   .tier-badge{display:inline-block;background:rgba(245,158,11,.12);color:var(--accent3);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(245,158,11,.25);}
-  /* Note: class name kept as .tier-badge internally, but labeled "Job Level" in the UI */
+  /* Note: class name kept as .tier-badge internally, but labeled "Job Code" in the UI */
 
   .state-box{padding:80px 32px;text-align:center;color:var(--muted);}
   .state-icon{font-size:44px;margin-bottom:14px;}
@@ -336,7 +337,7 @@
         <summary>Employee Tier · Food / Transpo / Hazard</summary>
         <div class="cfg-body">
           <div class="hint">Prefilled from your Multi-M reference sheet. Edit amounts or add/remove tiers as needed.</div>
-          <div class="tier-head"><span>Job Level</span><span>Food</span><span>Transpo</span><span>Hazard</span></div>
+          <div class="tier-head"><span>Job Code</span><span>Food</span><span>Transpo</span><span>Hazard</span></div>
           <div id="tier-rows"></div>
           <button class="add-tier-btn" onclick="addTierRow()">+ Add tier</button>
         </div>
@@ -378,7 +379,7 @@
           <option value="no_allow">No allowance</option>
         </select>
         <select id="tier-category-filter" onchange="renderResults()">
-          <option value="">All Job Levels</option>
+          <option value="">All Job Codes</option>
           <option value="MANAGER">Manager</option>
           <option value="SUPERVISOR">Supervisor</option>
           <option value="TEAM LEADER">Team Leader</option>
@@ -448,8 +449,8 @@ function showToast(msg,type,duration){
 var employees = [];     // {id, name, position, tier}
 var results = [];       // computed rows
 
-var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','Half day work, on leave on the other half','Absent','Non-working Holiday','Half-day work, unconfirmed on the other half','SA < required hours','Unverified'];
-var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','absent','nwh','halfday_unfiled','sa_below','unverified'];
+var ATT_STATUSES = ['Onsite','WFH','Late (Onsite)','On Leave','Half day work, on leave on the other half','Half-day work, unconfirmed on the other half','Absent','Non-working Holiday','SA < required hours','Unverified'];
+var ATT_KEYS = ['onsite','wfh','late','leave','leave_half','halfday_unfiled','absent','nwh','sa_below','unverified'];
 
 var DEFAULT_TIERS = [
   ['MANAGER - 1',400,0,0],['MANAGER - 2',300,0,0],['MANAGER - 3',150,0,0],['MANAGER - 4',500,1000,0],
@@ -533,8 +534,12 @@ function renderEligTable(){
     if(i===2){
       html += '<tr class="elig-group-label"><td colspan="4">Derived statuses</td></tr>';
     }
+    var saBelowTip = 'Only applies when hours worked fall at or below half the shift, with no leave or Schedule Adjustment on file. Working more than half the shift gets full allowance based on Onsite/WFH, even if it is still short of the complete shift.';
+    var labelCell = (k==='sa_below')
+      ? '<td>'+label+' <span class="info-icon" title="'+saBelowTip+'">\u24d8</span></td>'
+      : '<td>'+label+'</td>';
     html += '<tr'+(isPrimary?' class="elig-primary"':'')+'>' +
-      '<td>'+label+'</td>' +
+      labelCell +
       '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="food" '+(e.food?'checked':'')+'></td>' +
       '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="transpo" '+(e.transpo?'checked':'')+'></td>' +
       '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="hazard" '+(e.hazard?'checked':'')+'></td>' +
@@ -729,7 +734,9 @@ document.getElementById('emp-file').addEventListener('change', function(e){
         if(bioKey && r[bioKey]!=='') biometricToEmpId[String(r[bioKey]).trim()] = normId(id);
         var tier = deriveTier(r);
         if(!tier) unmapped++;
-        return {id:String(id), name:name, position:position, tier:tier, att:{}};
+        var payrollTypeKey = findKey(r,[/^Payroll Type$/i]);
+        var payrollType = payrollTypeKey ? String(r[payrollTypeKey]||'').trim() : '';
+        return {id:String(id), name:name, position:position, tier:tier, att:{}, payrollType:payrollType};
       }).filter(Boolean);
       // Re-parse the attendance detail sheet now that required-hours are known
       if(lastAttWorkbook && lastAttDetailSheetName){
@@ -748,9 +755,9 @@ document.getElementById('emp-file').addEventListener('change', function(e){
       recomputeAttendance();
       document.getElementById('run-btn').disabled = employees.length===0;
       if(unmapped>0){
-        showToast(unmapped+' of '+employees.length+' employees could not be matched to a Job Level (Job Code didn\'t match a row in the Tier Rate Table) — they\'ll show ₱0 until Job Code is corrected.', 'warning', 9000);
+        showToast(unmapped+' of '+employees.length+' employees could not be matched to a row in the Tier Rate Table — check that Job Code is set correctly for them. They\'ll show ₱0 until it\'s corrected.', 'warning', 9000);
       } else {
-        showToast('Loaded '+employees.length+' employees from '+f.name+' — Job Level auto-matched from Job Code.', 'success');
+        showToast('Loaded '+employees.length+' employees from '+f.name+' — matched to the Tier Rate Table using Job Code.', 'success');
       }
     } catch(err){
       dzError('emp', 'Heads up! Could not read this file. Make sure it\'s exported as .xls or .xlsx from Sprout HR → Administration Tools → Employee List Report, then try again.');
@@ -882,7 +889,7 @@ function parseDetailedSheet(wb, sheetName){
           // "Total Hours Worked" — check the actual worked hours from there.
           var restWorkedHours = restHours>0 ? restHours : totalHoursWorked;
           if(restWorkedHours>0){
-            if(effectiveRequiredHours && restWorkedHours < effectiveRequiredHours){ counts.sa_below++; key='sa_below'; }
+            if(halfDayThreshold!==null && restWorkedHours <= halfDayThreshold){ counts.sa_below++; key='sa_below'; }
             else {
               // Per the reference sheet, eligibility for working a rest day now
               // depends on clock-in method — same rule as everything else, not a
@@ -902,9 +909,9 @@ function parseDetailedSheet(wb, sheetName){
             // Holiday work gets recorded under the LH/SH differential columns, not
             // "Total Hours Worked" — check the actual worked hours from there.
             var holidayWorkedHours = (lhHours+shHours)>0 ? (lhHours+shHours) : totalHoursWorked;
-            if(effectiveRequiredHours && holidayWorkedHours < effectiveRequiredHours){
-              // Tagged as a holiday and something was logged, but not enough hours
-              // to count as actually having worked it — a schedule-adjustment shortfall.
+            if(halfDayThreshold!==null && holidayWorkedHours <= halfDayThreshold){
+              // At or below half the shift, with no leave/SA to explain it —
+              // a schedule-adjustment shortfall, same threshold as everywhere else.
               counts.sa_below++; key='sa_below';
             } else {
               // Per the reference sheet, eligibility for working a holiday now
@@ -953,9 +960,12 @@ function parseDetailedSheet(wb, sheetName){
               else { counts.halfday_unfiled++; key='halfday_unfiled'; note='No logs/leave found on the other half'; }
             } else if(lateMin>0){
               counts.late++; key='late';
-            } else if(effectiveRequiredHours && totalHoursWorked < effectiveRequiredHours){
-              counts.sa_below++; key='sa_below';
             } else {
+              // More than half the shift was worked (per the earlier half-day
+              // check above) — full allowance, even if still short of the
+              // complete shift. Only at-or-below half the shift results in no
+              // allowance; a genuine full-shortfall still gets caught by the
+              // approved-Schedule-Adjustment check earlier in this chain.
               key='onsite';
             }
           } else if(splitResolved==='wfh'){
@@ -983,6 +993,8 @@ function parseDetailedSheet(wb, sheetName){
           // keep the branch-specific note as-is
         } else if(confirmedByLog){
           note = confirmedByLog==='coa' ? 'Confirmed via COA' : 'Confirmed via biometric (auto push)';
+        } else if(key==='wfh'){
+          note = 'Confirmed via approved OB';
         } else if(dKey && empUnmapped[dKey]){
           note = 'Clock-in method not recognized';
         } else if(key==='unverified'){
@@ -1499,6 +1511,7 @@ function recomputeAttendance(){
       if(k==='wfh'){
         var h = (wfhHoursByDate[id]||{})[dk];
         if(h!=null && empEffReq && h < empEffReq) return {key:'sa_below', note:''};
+        return {key:'wfh', note:'Confirmed via approved OB'};
       }
       if(k==='leave_half'){
         // A half-day leave was filed, but the Detailed sheet showed no matching
@@ -1520,7 +1533,7 @@ function recomputeAttendance(){
         var entry = byDate[dk];
         if(entry.locked){
           var isHalfDayLock = entry.key==='halfday_filed' || entry.key==='halfday_unfiled';
-          if(rawK==='wfh' && isHalfDayLock){ entry.key='wfh'; entry.note=''; }
+          if(rawK==='wfh' && isHalfDayLock){ entry.key='wfh'; entry.note='Confirmed via approved OB — half day work, half day on leave'; }
           return;
         }
         var resolved = resolveApprovalKey(dk, rawK);
@@ -1553,7 +1566,7 @@ function computeAllowances(){
       if(e.transpo) transpo += rate.transpo;
       if(e.hazard) hazard += rate.hazard;
     });
-    return {id:emp.id, name:emp.name, tier:emp.tier||'—', food:food, transpo:transpo, hazard:hazard, total:food+transpo+hazard};
+    return {id:emp.id, name:emp.name, tier:emp.tier||'—', food:food, transpo:transpo, hazard:hazard, total:food+transpo+hazard, payrollType:emp.payrollType||''};
   });
   renderResults();
   showToast('Computed allowances for '+results.length+' employees.', 'success');
@@ -1587,7 +1600,7 @@ function renderResults(){
     return;
   }
 
-  var html = '<table><thead><tr><th>Employee</th><th>Job Level</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th><th class="num">Total</th></tr></thead><tbody>';
+  var html = '<table><thead><tr><th>Employee</th><th>Job Code</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th><th class="num">Total</th></tr></thead><tbody>';
   rows.forEach(function(r){
     html += '<tr class="clickable-row" style="cursor:pointer" data-emp-id="'+escapeHtml(r.id)+'" title="Click for daily breakdown">' +
       '<td><div class="emp-name">'+escapeHtml(r.name||'(no name)')+'</div><div class="emp-id">'+escapeHtml(r.id)+'</div></td>' +
@@ -1622,7 +1635,7 @@ function openDayBreakdown(empId){
   var log = (emp.dailyLog||[]).slice().sort(function(a,b){ return (a.dateKey||'')<(b.dateKey||'') ? -1 : 1; });
 
   document.getElementById('day-modal-title').textContent = emp.name || emp.id;
-  document.getElementById('day-modal-sub').textContent = emp.id + ' · ' + (emp.tier||'No Job Level matched');
+  document.getElementById('day-modal-sub').textContent = emp.id + ' · ' + (emp.tier||'No Job Code matched');
 
   // Quick-reference: what this tier actually earns if Onsite vs WFH, per the
   // current Eligibility Matrix — so it's clear at a glance without cross-checking.
@@ -1642,7 +1655,7 @@ function openDayBreakdown(empId){
     return '<div class="ti-card"><div class="ti-card-title">'+label+'</div>'+linesHtml+'</div>';
   }
   document.getElementById('day-modal-tierinfo').innerHTML =
-    '<div class="ti-joblevel"><span class="ti-label">Job Level</span><span class="ti-value">'+escapeHtml(emp.tier||'No Job Level matched')+'</span></div>' +
+    '<div class="ti-joblevel"><span class="ti-label">Job Code</span><span class="ti-value">'+escapeHtml(emp.tier||'No Job Code matched')+'</span></div>' +
     '<div class="ti-cards">' +
       cardHtml('Onsite', eligibility.onsite||{}) +
       cardHtml('WFH', eligibility.wfh||{}) +
@@ -1691,7 +1704,7 @@ function exportSummary(){
   var hideZero = document.getElementById('hide-zero')?.checked;
   var filteredResults = results.filter(r=>!hideZero || r.total>0);
   var rows = filteredResults.map(function(r){
-    return {'Employee ID':r.id,'Employee Name':r.name,'Job Level':r.tier,'Food':r.food,'Transportation':r.transpo,'Hazard Pay':r.hazard,'Total':r.total};
+    return {'Employee ID':r.id,'Employee Name':r.name,'Job Code':r.tier,'Food':r.food,'Transportation':r.transpo,'Hazard Pay':r.hazard,'Total':r.total};
   });
   var ws = XLSX.utils.json_to_sheet(rows);
   var wb = XLSX.utils.book_new();
@@ -1715,7 +1728,7 @@ function exportSummary(){
         dailyRows.push({
           'Employee ID': emp.id,
           'Employee Name': emp.name,
-          'Job Level': emp.tier || '—',
+          'Job Code': emp.tier || '—',
           'Date': d.date || d.dateKey || '',
           'Status': displayLabel(d),
           'Note': d.note || '',
@@ -1768,12 +1781,17 @@ function updateAdjModalPreview(){
     'before-tax: <b>'+escapeHtml(f.beforeTax)+'</b>, taxable: <b>'+escapeHtml(f.taxable)+'</b>.';
 }
 document.getElementById('adj-modal').addEventListener('input', updateAdjModalPreview);
-function confirmAdjExport(){
-  closeAdjModal();
-  if(adjFile){ exportAdjustmentFromTemplate(); return; }
-  var mf = getAdjModalFields();
-  var hideZero = document.getElementById('hide-zero')?.checked;
-  var rows = results.filter(r=>!hideZero || r.total>0);
+// Groups employees by Payroll Type for the segregated Adjustment Template
+// export — Daily and Hourly are treated as one "daily paid" group, Semi-Monthly
+// is its own group, and blank/unrecognized values are excluded with a warning
+// rather than silently defaulting into either bucket.
+function classifyPayrollGroup(payrollType){
+  var pt = (payrollType||'').trim().toLowerCase();
+  if(pt==='daily' || pt==='hourly') return 'daily';
+  if(pt==='semi-monthly' || pt==='semimonthly' || pt==='semi monthly') return 'semimonthly';
+  return null;
+}
+function buildAdjAoa(rows, mf){
   var aoa = [
     ['STATUS','Employee ID','Employee Name','Adjustment Type','Adjustment Name','Adjustment Code','Adjustment Amount','Remarks','Apply Before Tax','Is Taxable'],
     ['SAMPLE DATA','E0000001','Juan Dela Cruz',mf.adjType,mf.adjName,mf.adjCode,1000,mf.adjName,mf.beforeTax,mf.taxable]
@@ -1781,92 +1799,152 @@ function confirmAdjExport(){
   rows.forEach(function(r){
     aoa.push(['', r.id, r.name, mf.adjType, mf.adjName, mf.adjCode, r.total, mf.adjName+' ('+r.tier+')', mf.beforeTax, mf.taxable]);
   });
-  var ws = XLSX.utils.aoa_to_sheet(aoa);
-  var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'ProcessPayrollImportAdjustment');
-  XLSX.writeFile(wb, 'Daily_Allowance_Adjustment_Template_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  return aoa;
+}
+function confirmAdjExport(){
+  closeAdjModal();
+  if(adjFile){ exportAdjustmentFromTemplate(); return; }
+  var mf = getAdjModalFields();
+  var hideZero = document.getElementById('hide-zero')?.checked;
+  var rows = results.filter(r=>!hideZero || r.total>0);
+
+  var dailyRows = [], semiMonthlyRows = [], excludedNames = [];
+  rows.forEach(function(r){
+    var group = classifyPayrollGroup(r.payrollType);
+    if(group==='daily') dailyRows.push(r);
+    else if(group==='semimonthly') semiMonthlyRows.push(r);
+    else excludedNames.push(r.name||r.id);
+  });
+
+  var dateSuffix = new Date().toISOString().slice(0,10);
+  var filesWritten = 0;
+  if(dailyRows.length){
+    var wbD = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wbD, XLSX.utils.aoa_to_sheet(buildAdjAoa(dailyRows, mf)), 'ProcessPayrollImportAdjustment');
+    XLSX.writeFile(wbD, 'Daily_Allowance_Adjustment_Template_DailyPaid_'+dateSuffix+'.xlsx');
+    filesWritten++;
+  }
+  if(semiMonthlyRows.length){
+    var wbS = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wbS, XLSX.utils.aoa_to_sheet(buildAdjAoa(semiMonthlyRows, mf)), 'ProcessPayrollImportAdjustment');
+    XLSX.writeFile(wbS, 'Daily_Allowance_Adjustment_Template_SemiMonthly_'+dateSuffix+'.xlsx');
+    filesWritten++;
+  }
   logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+
+  if(excludedNames.length){
+    showToast(excludedNames.length+' employee(s) excluded — no Payroll Type set (or unrecognized value) in the Employee List: '+excludedNames.slice(0,5).join(', ')+(excludedNames.length>5?', …':'')+'.', 'warning', 10000);
+  }
+  if(filesWritten===0){
+    showToast('Nothing to export — no employees matched a Daily or Semi-Monthly Payroll Type.', 'error');
+  } else {
+    showToast('Exported '+dailyRows.length+' Daily-paid and '+semiMonthlyRows.length+' Semi-Monthly employee(s) into '+filesWritten+' file(s).', 'success');
+  }
 }
 
 // Fill an uploaded Payrollpie template in-place, same pattern as V1/V2:
 // employees already listed in the template get their amount filled in;
 // those with allowance go on top, those without go below (or are dropped if hide-zero is checked).
+// Segregated into two separate output files by Payroll Type (Daily/Hourly vs
+// Semi-Monthly), same as the fresh-file export path — needs two independent
+// re-reads of the uploaded template since each group's file mutates its own
+// copy of the workbook's cell structure.
 function exportAdjustmentFromTemplate(){
   var hideZero = document.getElementById('hide-zero')?.checked;
   var reader = new FileReader();
   reader.onload = function(ev){
     try {
-      var wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellStyles:true});
-      var ws = wb.Sheets['ProcessPayrollImportAdjustment'];
-      if(!ws){ showToast('Sheet "ProcessPayrollImportAdjustment" not found in that template.', 'error'); return; }
-
-      var DATA_FONT = {name:'Calibri', sz:11};
-      var range = XLSX.utils.decode_range(ws['!ref']);
-
-      var templateRows = [];
-      for(var r=2;r<=range.e.r;r++){
-        var rowData = {};
-        for(var c=0;c<=range.e.c;c++){
-          var addr = XLSX.utils.encode_cell({r:r,c:c});
-          if(ws[addr]) rowData[c] = Object.assign({}, ws[addr]);
-        }
-        var statusCell = ws[XLSX.utils.encode_cell({r:r,c:0})];
-        var isSample = statusCell && String(statusCell.v||'').indexOf('SAMPLE')>-1;
-        var idCell = ws[XLSX.utils.encode_cell({r:r,c:1})];
-        var empId = idCell && idCell.v!==undefined ? String(idCell.v).trim() : '';
-        templateRows.push({empId:empId, rowData:rowData, isSample:isSample});
-      }
+      var rawBuffer = ev.target.result;
+      var probeWb = XLSX.read(new Uint8Array(rawBuffer), {type:'array', cellStyles:true});
+      var probeWs = probeWb.Sheets['ProcessPayrollImportAdjustment'];
+      if(!probeWs){ showToast('Sheet "ProcessPayrollImportAdjustment" not found in that template.', 'error'); return; }
 
       var allowanceMap = {};
       results.forEach(function(r){ allowanceMap[normId(r.id)] = r; });
-
       var mf = getAdjModalFields();
-      var withData = [], withoutData = [], filled = 0;
-      templateRows.filter(function(t){return !t.isSample;}).forEach(function(tr){
-        var r = allowanceMap[normId(tr.empId)];
-        if(r && r.total>0){
-          tr.rowData[3] = {t:'s', v:mf.adjType, s:{font:DATA_FONT}};
-          tr.rowData[4] = {t:'s', v:mf.adjName, s:{font:DATA_FONT}};
-          tr.rowData[5] = {t:'s', v:mf.adjCode, s:{font:DATA_FONT}};
-          tr.rowData[6] = {t:'n', v:r.total, s:{font:DATA_FONT}};
-          tr.rowData[7] = {t:'s', v:mf.adjName+' ('+r.tier+')', s:{font:DATA_FONT}};
-          tr.rowData[8] = {t:'s', v:mf.beforeTax, s:{font:DATA_FONT}};
-          tr.rowData[9] = {t:'s', v:mf.taxable, s:{font:DATA_FONT}};
-          withData.push(tr);
-          filled++;
-        } else {
-          withoutData.push(tr);
+      var range = XLSX.utils.decode_range(probeWs['!ref']);
+
+      function readTemplateRows(ws){
+        var rows = [];
+        for(var r=2;r<=range.e.r;r++){
+          var rowData = {};
+          for(var c=0;c<=range.e.c;c++){
+            var addr = XLSX.utils.encode_cell({r:r,c:c});
+            if(ws[addr]) rowData[c] = Object.assign({}, ws[addr]);
+          }
+          var statusCell = ws[XLSX.utils.encode_cell({r:r,c:0})];
+          var isSample = statusCell && String(statusCell.v||'').indexOf('SAMPLE')>-1;
+          var idCell = ws[XLSX.utils.encode_cell({r:r,c:1})];
+          var empId = idCell && idCell.v!==undefined ? String(idCell.v).trim() : '';
+          rows.push({empId:empId, rowData:rowData, isSample:isSample});
         }
+        return rows;
+      }
+
+      var DATA_FONT = {name:'Calibri', sz:11};
+      var excludedNames = [];
+      var totalFilled = 0, filesWritten = 0;
+      var dateSuffix = new Date().toISOString().slice(0,10);
+
+      ['daily','semimonthly'].forEach(function(group){
+        var wb = XLSX.read(new Uint8Array(rawBuffer), {type:'array', cellStyles:true});
+        var ws = wb.Sheets['ProcessPayrollImportAdjustment'];
+        var templateRows = readTemplateRows(ws);
+        var withData = [], withoutData = [], filled = 0;
+        templateRows.filter(function(t){return !t.isSample;}).forEach(function(tr){
+          var r = allowanceMap[normId(tr.empId)];
+          var empGroup = r ? classifyPayrollGroup(r.payrollType) : null;
+          if(group==='daily' && empGroup===null && r){ if(excludedNames.indexOf(r.name||r.id)===-1) excludedNames.push(r.name||r.id); }
+          if(empGroup!==group) return; // this employee belongs to the other file (or is excluded)
+          if(r && r.total>0){
+            tr.rowData[3] = {t:'s', v:mf.adjType, s:{font:DATA_FONT}};
+            tr.rowData[4] = {t:'s', v:mf.adjName, s:{font:DATA_FONT}};
+            tr.rowData[5] = {t:'s', v:mf.adjCode, s:{font:DATA_FONT}};
+            tr.rowData[6] = {t:'n', v:r.total, s:{font:DATA_FONT}};
+            tr.rowData[7] = {t:'s', v:mf.adjName+' ('+r.tier+')', s:{font:DATA_FONT}};
+            tr.rowData[8] = {t:'s', v:mf.beforeTax, s:{font:DATA_FONT}};
+            tr.rowData[9] = {t:'s', v:mf.taxable, s:{font:DATA_FONT}};
+            withData.push(tr);
+            filled++;
+          } else {
+            withoutData.push(tr);
+          }
+        });
+        totalFilled += filled;
+        if(withData.length===0 && withoutData.length===0) return; // nothing for this group at all
+
+        for(var r2=2;r2<=range.e.r;r2++){
+          for(var c2=0;c2<=range.e.c;c2++){
+            var addr2 = XLSX.utils.encode_cell({r:r2,c:c2});
+            if(ws[addr2]) delete ws[addr2];
+          }
+        }
+        var sampleRows = templateRows.filter(function(t){return t.isSample;});
+        var rowsToWrite = hideZero ? sampleRows.concat(withData) : sampleRows.concat(withData, withoutData);
+        var rowIdx = 2;
+        rowsToWrite.forEach(function(tr){
+          Object.keys(tr.rowData).forEach(function(c){
+            var addr = XLSX.utils.encode_cell({r:rowIdx, c:parseInt(c)});
+            ws[addr] = Object.assign({}, tr.rowData[c]);
+          });
+          rowIdx++;
+        });
+        ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rowIdx-1, c:range.e.c}});
+        var suffix = group==='daily' ? 'DailyPaid' : 'SemiMonthly';
+        XLSX.writeFile(wb, 'Daily_Allowance_Adjustment_Template_'+suffix+'_'+dateSuffix+'.xlsx', {cellStyles:true});
+        filesWritten++;
       });
 
-      if(filled===0){
+      logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+
+      if(totalFilled===0 && filesWritten===0){
         showToast('No employees matched the template. Make sure IDs line up with your Employee List.', 'error', 9000);
         return;
       }
-
-      for(var r2=2;r2<=range.e.r;r2++){
-        for(var c2=0;c2<=range.e.c;c2++){
-          var addr2 = XLSX.utils.encode_cell({r:r2,c:c2});
-          if(ws[addr2]) delete ws[addr2];
-        }
+      if(excludedNames.length){
+        showToast(excludedNames.length+' employee(s) excluded — no Payroll Type set (or unrecognized value) in the Employee List: '+excludedNames.slice(0,5).join(', ')+(excludedNames.length>5?', …':'')+'.', 'warning', 10000);
       }
-
-      var sampleRows = templateRows.filter(function(t){return t.isSample;});
-      var rowsToWrite = hideZero ? sampleRows.concat(withData) : sampleRows.concat(withData, withoutData);
-      var rowIdx = 2;
-      rowsToWrite.forEach(function(tr){
-        Object.keys(tr.rowData).forEach(function(c){
-          var addr = XLSX.utils.encode_cell({r:rowIdx, c:parseInt(c)});
-          ws[addr] = Object.assign({}, tr.rowData[c]);
-        });
-        rowIdx++;
-      });
-      ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0}, e:{r:rowIdx-1, c:range.e.c}});
-      XLSX.writeFile(wb, 'Daily_Allowance_Adjustment_Template_'+new Date().toISOString().slice(0,10)+'.xlsx', {cellStyles:true});
-      logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
-      showToast(hideZero
-        ? filled+' employee(s) with allowance exported. '+withoutData.length+' without data excluded.'
-        : filled+' employee(s) with allowance exported. '+withoutData.length+' without data grouped below.', 'success', 6000);
+      showToast('Filled '+totalFilled+' employee(s) with allowance across '+filesWritten+' file(s), split by Payroll Type.', 'success', 6000);
     } catch(err){
       showToast('Could not fill that template: '+err.message, 'error');
     }
