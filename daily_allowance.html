@@ -1016,7 +1016,12 @@ function parseDetailedSheet(wb, sheetName){
         if(note){
           // keep the branch-specific note as-is
         } else if(confirmedByLog){
-          note = confirmedByLog==='coa' ? 'Confirmed via COA' : 'Confirmed via biometric (auto push)';
+          var methodLabel = confirmedByLog==='coa' ? 'COA'
+            : confirmedByLog==='web_bundy' ? 'Web Bundy'
+            : confirmedByLog==='geofence'  ? 'Geofence'
+            : confirmedByLog==='geotag'    ? 'Geotag'
+            : confirmedByLog;
+          note = 'Confirmed via '+methodLabel;
         } else if(key==='wfh'){
           note = 'Confirmed via approved OB';
         } else if(dKey && empUnmapped[dKey]){
@@ -1345,10 +1350,10 @@ function removeAdjFile(e){
 // ATTENDANCE LOGS UPLOAD (Biometric / COA) — confirms Onsite on days
 // the Detailed sheet shows as "NO LOGS"
 // ════════════════════════════════════════════
-var onsiteLogDates = {};   // normId(empId) -> {dateKey: 'coa'|'biometric'}
+var onsiteLogDates = {};   // normId(empId) -> {dateKey: 'coa'|'web_bundy'|'geofence'|'geotag'}
 var unmappedLogDates = {}; // normId(empId) -> {dateKey: rawNotes} — for surfacing per-day in the breakdown
 var lastCoaWorkbook = null;
-var autoPushTimeByDate = {}; // normId(empId) -> {dateKey: hourOfDay} — only for "auto push" entries, which carry a real time
+var autoPushTimeByDate = {}; // normId(empId) -> {dateKey: hourOfDay} — for Web Bundy, Geofence, and Geotag entries which carry a real clock-in time (unlike COA which is date-only)
 
 var lastUnmappedClockInMethods = []; // filled by parseCoaLog for the caller to warn about
 
@@ -1368,13 +1373,21 @@ function parseCoaLog(wb){
     var rawNotes = String(r['Notes']||'').trim();
     var notes = rawNotes.toLowerCase();
 
-    // Only these two count as valid Onsite confirmation. Every other clock-in
-    // method — Bundy, Manually added, Batch add, Excel upload, or anything else —
-    // flags as "not yet mapped out" rather than silently confirming or excluding.
-    var isCoa = notes.indexOf('certificateofattendance')>-1;
-    var isAutoPush = notes.indexOf('auto push')>-1;
+    // Only these methods count as valid Onsite confirmation:
+    // - Certificate of Attendance (COA): filed manually, date-only, always wins ties
+    // - Web Bundy: clock-in/out via web browser
+    // - Geofence: clock-in/out triggered by entering/leaving a defined geofence zone
+    // - Geotag: clock-in/out with GPS location tagging
+    // Auto-push has been removed — it is no longer treated as Onsite confirmation.
+    // Every other method (Manually added, Batch add, Excel upload, etc.) flags as
+    // "not yet mapped out" rather than silently confirming or excluding.
+    var isCoa      = notes.indexOf('certificateofattendance')>-1;
+    var isWebBundy = notes.indexOf('web bundy')>-1;
+    var isGeofence = notes.indexOf('geofence')>-1;
+    var isGeotag   = notes.indexOf('geotag')>-1;
+    var isOnsite   = isCoa || isWebBundy || isGeofence || isGeotag;
 
-    if(!isCoa && !isAutoPush){
+    if(!isOnsite){
       if(rawNotes) unmapped[rawNotes] = true;
       var ud = excelDateToJS(r['LogTime']);
       if(ud){
@@ -1390,16 +1403,17 @@ function parseCoaLog(wb){
     if(!d) return;
     var key = dateKey(d);
     out[empId] = out[empId] || {};
-    // Track which method confirmed it — COA takes label priority if a date somehow has both.
-    if(!out[empId][key] || isCoa) out[empId][key] = isCoa ? 'coa' : 'biometric';
-    // Auto push carries a real clock-in time (unlike COA, which is date-only) —
-    // needed to compare against an approved WFH's Time From when someone splits
-    // a day between Onsite and WFH.
-    if(isAutoPush){
+    // COA takes label priority if a date has both COA and another method.
+    // Web Bundy, Geofence, and Geotag all carry real timestamps — track the
+    // earliest punch for split-day Onsite-vs-WFH comparison.
+    var method = isCoa ? 'coa' : isWebBundy ? 'web_bundy' : isGeofence ? 'geofence' : 'geotag';
+    if(!out[empId][key] || isCoa) out[empId][key] = method;
+    if(!isCoa){
+      // All non-COA methods carry a real clock-in time
       var punchHour = d.getHours() + d.getMinutes()/60;
       autoPushTimeByDate[empId] = autoPushTimeByDate[empId] || {};
       if(autoPushTimeByDate[empId][key]===undefined || punchHour < autoPushTimeByDate[empId][key]){
-        autoPushTimeByDate[empId][key] = punchHour; // keep the earliest punch of the day
+        autoPushTimeByDate[empId][key] = punchHour;
       }
     }
   });
