@@ -169,7 +169,7 @@ body{padding:10px;}
   .add-atype-btn:hover{border-color:var(--accent);color:var(--accent);}
 
   .run-btn{width:100%;padding:11px;background:var(--accent);color:#021a0d;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:opacity .2s,transform .1s;}
-  .cfg-btn{padding:8px 20px;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);border-radius:100px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
+  .cfg-btn{padding:7px 14px;font-size:11px;font-family:'Sora',sans-serif;font-weight:600;border:1.5px solid var(--border);background:var(--surface2);color:var(--text);border-radius:100px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;}
   .cfg-btn:hover{background:var(--surface);border-color:var(--accent2);}
   .cfg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;}
   .cfg-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:360px;max-width:95vw;}
@@ -443,7 +443,7 @@ body{padding:10px;}
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow:visible;">
       <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Config</span>
       <button class="cfg-btn" onclick="saveConfigNamed()">💾 Save</button>
       <button class="cfg-btn" onclick="loadConfigNamed()">📂 Load</button>
