@@ -380,14 +380,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-he
   <!-- LEFT -->
   <div class="left-panel">
 
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Config</span>
-      <button class="cfg-btn" onclick="saveConfigNamed()">💾 Save</button>
-      <button class="cfg-btn" onclick="loadConfigNamed()">📂 Load</button>
-      <button class="cfg-btn" onclick="clearConfig()">↩ Reset</button>
-      <span id="config-label" style="font-size:10px;color:var(--muted);font-style:italic;"></span>
-    </div>
-
     <!-- Files -->
     <div>
       <div class="section-title">Input Files</div>
@@ -418,6 +410,14 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--text);min-he
         <div class="drop-filename" id="fn-adj"></div>
         <button class="remove-file-btn" onclick="removeFile(event,'adj')">✕ Remove</button>
       </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Config</span>
+      <button class="cfg-btn" onclick="saveConfigNamed()">💾 Save</button>
+      <button class="cfg-btn" onclick="loadConfigNamed()">📂 Load</button>
+      <button class="cfg-btn" onclick="clearConfig()">↩ Reset</button>
+      <span id="config-label" style="font-size:10px;color:var(--muted);font-style:italic;"></span>
     </div>
 
     <!-- Eligibility -->
