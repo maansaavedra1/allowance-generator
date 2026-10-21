@@ -110,6 +110,24 @@
   .emp-row select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:9px;padding:2px 4px;border-radius:5px;outline:none;width:118px;}
 
   .run-btn{width:100%;padding:11px;background:var(--accent3);color:#2b1a02;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:opacity .2s,transform .1s;}
+  .cfg-btn{padding:5px 10px;font-size:10px;font-family:'Sora',sans-serif;font-weight:600;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:6px;cursor:pointer;transition:background .15s;}
+  .cfg-btn:hover{background:var(--surface);}
+
+  /* Config modal */
+  .cfg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;}
+  .cfg-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:360px;max-width:95vw;}
+  .cfg-modal h3{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text);}
+  .cfg-modal input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:12px;padding:8px 10px;border-radius:8px;outline:none;margin-bottom:12px;}
+  .cfg-modal-btns{display:flex;gap:8px;justify-content:flex-end;}
+  .cfg-modal-btns button{padding:7px 16px;border-radius:8px;border:none;font-family:'Sora',sans-serif;font-size:11px;font-weight:600;cursor:pointer;}
+  .cfg-modal-save-btn{background:var(--accent);color:#fff;}
+  .cfg-modal-cancel-btn{background:var(--surface2);color:var(--text);}
+  .cfg-list-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--surface2);margin-bottom:6px;cursor:pointer;transition:background .15s;}
+  .cfg-list-item:hover{background:var(--border);}
+  .cfg-list-item-name{flex:1;font-size:11px;font-weight:600;color:var(--text);}
+  .cfg-list-item-date{font-size:9px;color:var(--muted);}
+  .cfg-list-item-del{background:none;border:none;cursor:pointer;color:#dc2626;font-size:12px;padding:2px 4px;opacity:.6;}
+  .cfg-list-item-del:hover{opacity:1;}
   .run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px);}
   .run-btn:disabled{opacity:.35;cursor:not-allowed;}
 
@@ -353,6 +371,15 @@
         <div class="drop-filename" id="adj-filename"></div>
         <button class="remove-file-btn" onclick="removeAdjFile(event)">✕ Remove</button>
       </div>
+    </div>
+
+    <!-- Config Save / Load -->
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Config</span>
+      <button class="cfg-btn" onclick="saveConfig()" title="Save current Tier Rate Table and Eligibility Matrix">💾 Save</button>
+      <button class="cfg-btn" onclick="loadConfig()" title="Load a previously saved config">📂 Load</button>
+      <button class="cfg-btn" onclick="resetConfig()" title="Reset to defaults">↩ Reset</button>
+      <span id="config-label" style="font-size:10px;color:var(--muted);font-style:italic;"></span>
     </div>
 
     <div>
@@ -1988,6 +2015,129 @@ function exportAdjustmentFromTemplate(){
     }
   };
   reader.readAsArrayBuffer(adjFile);
+}
+
+// ════════════════════════════════════════════
+// CONFIG SAVE / LOAD
+// ════════════════════════════════════════════
+var CONFIG_STORAGE_KEY = 'daily-allowance-configs';
+
+function getAllConfigs(){
+  try { return JSON.parse(localStorage.getItem(CONFIG_STORAGE_KEY)||'{}'); } catch(e){ return {}; }
+}
+function setAllConfigs(obj){
+  try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(obj)); } catch(e){}
+}
+function buildConfigSnapshot(){
+  return { tiers: JSON.parse(JSON.stringify(DEFAULT_TIERS)), eligibility: JSON.parse(JSON.stringify(eligibility)) };
+}
+function applyConfigSnapshot(snap){
+  if(!snap || !snap.tiers || !snap.eligibility) return;
+  // Replace DEFAULT_TIERS in-place
+  DEFAULT_TIERS.length = 0;
+  snap.tiers.forEach(function(t){ DEFAULT_TIERS.push(t); });
+  // Replace eligibility in-place
+  Object.keys(eligibility).forEach(function(k){ delete eligibility[k]; });
+  Object.assign(eligibility, snap.eligibility);
+  renderTierRows();
+  renderEligTable();
+  if(employees.length) computeAllowances();
+}
+function updateConfigLabel(name){
+  var el = document.getElementById('config-label');
+  if(el) el.textContent = name ? 'Loaded: '+name : '';
+}
+
+function saveConfig(){
+  var configs = getAllConfigs();
+  var names = Object.keys(configs);
+  // Build modal
+  var overlay = document.createElement('div');
+  overlay.className = 'cfg-modal-overlay';
+  overlay.innerHTML = '<div class="cfg-modal">' +
+    '<h3>💾 Save Configuration</h3>' +
+    '<input id="cfg-save-name" placeholder="Config name (e.g. ITMI, Client A)" autocomplete="off" maxlength="60">' +
+    (names.length ? '<div style="font-size:9px;color:var(--muted);margin:-4px 0 10px;">Existing: '+names.join(', ')+'</div>' : '') +
+    '<div class="cfg-modal-btns">' +
+      '<button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Cancel</button>' +
+      '<button class="cfg-modal-save-btn" onclick="doSaveConfig()">Save</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  var inp = document.getElementById('cfg-save-name');
+  if(inp) inp.focus();
+  overlay.addEventListener('keydown', function(e){ if(e.key==='Escape') overlay.remove(); if(e.key==='Enter') doSaveConfig(); });
+}
+function doSaveConfig(){
+  var inp = document.getElementById('cfg-save-name');
+  var name = inp ? inp.value.trim() : '';
+  if(!name){ showToast('Please enter a name for this config.','warning',3000); return; }
+  var configs = getAllConfigs();
+  configs[name] = { snapshot: buildConfigSnapshot(), savedAt: new Date().toLocaleString() };
+  setAllConfigs(configs);
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  updateConfigLabel(name);
+  showToast('Config "'+name+'" saved.','success',3000);
+}
+
+function loadConfig(){
+  var configs = getAllConfigs();
+  var names = Object.keys(configs);
+  var overlay = document.createElement('div');
+  overlay.className = 'cfg-modal-overlay';
+  var listHtml = names.length
+    ? names.map(function(n){
+        var c = configs[n];
+        return '<div class="cfg-list-item" onclick="doLoadConfig(\''+escapeHtml(n)+'\')">' +
+          '<div>' +
+            '<div class="cfg-list-item-name">'+escapeHtml(n)+'</div>' +
+            '<div class="cfg-list-item-date">Saved: '+(c.savedAt||'')+'</div>' +
+          '</div>' +
+          '<button class="cfg-list-item-del" onclick="event.stopPropagation();doDeleteConfig(\''+escapeHtml(n)+'\')" title="Delete this config">✕</button>' +
+        '</div>';
+      }).join('')
+    : '<div style="font-size:11px;color:var(--muted);padding:12px 0;">No saved configs yet — save one first.</div>';
+  overlay.innerHTML = '<div class="cfg-modal">' +
+    '<h3>📂 Load Configuration</h3>' +
+    listHtml +
+    '<div class="cfg-modal-btns" style="margin-top:8px;">' +
+      '<button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Close</button>' +
+    '</div>' +
+  '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('keydown', function(e){ if(e.key==='Escape') overlay.remove(); });
+}
+function doLoadConfig(name){
+  var configs = getAllConfigs();
+  var c = configs[name];
+  if(!c || !c.snapshot){ showToast('Config "'+name+'" not found.','error',3000); return; }
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  applyConfigSnapshot(c.snapshot);
+  updateConfigLabel(name);
+  showToast('Config "'+name+'" loaded.','success',3000);
+}
+function doDeleteConfig(name){
+  var configs = getAllConfigs();
+  delete configs[name];
+  setAllConfigs(configs);
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  showToast('Config "'+name+'" deleted.','success',2000);
+  // Reopen the list with the updated set
+  setTimeout(loadConfig, 150);
+}
+function resetConfig(){
+  if(!confirm('Reset Tier Rate Table and Eligibility Matrix to defaults?')) return;
+  DEFAULT_TIERS.length = 0;
+  // Re-push the original hardcoded defaults
+  var orig = [["MANAGER - 1",200,350,175],["MANAGER - 2",200,350,175],["MANAGER - 3",200,350,175],["MANAGER - 4",200,350,175],["MANAGER - 5",200,350,175],["MANAGER - 6",200,350,175],["MANAGER - 7",200,350,175],["MANAGER - 8",200,350,175],["SUPERVISOR - 1",200,350,175],["SUPERVISOR - 2",200,350,175],["SUPERVISOR - 3",200,350,175],["SUPERVISOR - 4",200,350,175],["SUPERVISOR - 5",200,350,175],["SUPERVISOR - 6",200,350,175],["SUPERVISOR - 7",200,350,175],["SUPERVISOR - 8",200,350,175],["SUPERVISOR - 9",200,350,175],["SUPERVISOR - 10",200,350,175]];
+  orig.forEach(function(t){ DEFAULT_TIERS.push(t); });
+  var origElig = JSON.parse(JSON.stringify({onsite:{food:true,transpo:true,hazard:true},wfh:{food:true,transpo:false,hazard:false},late:{food:true,transpo:true,hazard:true},leave:{food:false,transpo:false,hazard:false},leave_half:{food:false,transpo:false,hazard:false},absent:{food:false,transpo:false,hazard:false},nwh:{food:false,transpo:false,hazard:false},halfday_unfiled:{food:false,transpo:false,hazard:false},sa_below:{food:false,transpo:false,hazard:false},unverified:{food:false,transpo:false,hazard:false}}));
+  Object.keys(eligibility).forEach(function(k){ delete eligibility[k]; });
+  Object.assign(eligibility, origElig);
+  renderTierRows();
+  renderEligTable();
+  updateConfigLabel('');
+  showToast('Config reset to defaults.','success',3000);
 }
 
 // ════════════════════════════════════════════
