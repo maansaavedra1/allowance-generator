@@ -169,6 +169,22 @@ body{padding:10px;}
   .add-atype-btn:hover{border-color:var(--accent);color:var(--accent);}
 
   .run-btn{width:100%;padding:11px;background:var(--accent);color:#021a0d;font-family:'Sora',sans-serif;font-weight:700;font-size:13px;border:none;border-radius:8px;cursor:pointer;transition:opacity .2s,transform .1s;}
+  .cfg-btn{padding:6px 14px;font-size:10px;font-family:'Sora',sans-serif;font-weight:600;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:20px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;}
+  .cfg-btn:hover{background:var(--surface);border-color:var(--accent2);}
+  .cfg-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;}
+  .cfg-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:360px;max-width:95vw;}
+  .cfg-modal h3{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text);}
+  .cfg-modal input[type=text]{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:12px;padding:8px 10px;border-radius:8px;outline:none;margin-bottom:12px;}
+  .cfg-modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px;}
+  .cfg-modal-btns button{padding:7px 16px;border-radius:8px;border:none;font-family:'Sora',sans-serif;font-size:11px;font-weight:600;cursor:pointer;}
+  .cfg-modal-save-btn{background:var(--accent);color:#021a0d;}
+  .cfg-modal-cancel-btn{background:var(--surface2);color:var(--text);}
+  .cfg-list-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--surface2);margin-bottom:6px;cursor:pointer;}
+  .cfg-list-item:hover{background:var(--border);}
+  .cfg-list-item-name{flex:1;font-size:11px;font-weight:600;color:var(--text);}
+  .cfg-list-item-date{font-size:9px;color:var(--muted);}
+  .cfg-list-item-del{background:none;border:none;cursor:pointer;color:#dc2626;font-size:12px;padding:2px 4px;opacity:.6;}
+  .cfg-list-item-del:hover{opacity:1;}
   .run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px);}
   .run-btn:disabled{opacity:.35;cursor:not-allowed;}
   .recalc-note{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;}
@@ -396,6 +412,14 @@ body{padding:10px;}
   <!-- LEFT -->
   <div class="left-panel">
 
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">Config</span>
+      <button class="cfg-btn" onclick="saveConfigNamed()">💾 Save</button>
+      <button class="cfg-btn" onclick="loadConfigNamed()">📂 Load</button>
+      <button class="cfg-btn" onclick="clearConfig()">↩ Reset</button>
+      <span id="config-label" style="font-size:10px;color:var(--muted);font-style:italic;"></span>
+    </div>
+
     <div>
       <div class="section-title">Input Files</div>
       <div class="drop-zone" id="dz-emp" ondragover="dz(event,'emp',true)" ondragleave="dz(event,'emp',false)" ondrop="drop(event,'emp')">
@@ -451,11 +475,6 @@ body{padding:10px;}
     </div>
 
     <div>
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <button onclick="saveConfig()" style="flex:1;padding:8px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">💾 Save Config</button>
-        <label style="flex:1;padding:8px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;text-align:center;transition:all .2s;" onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📂 Load Config<input type="file" accept=".json" style="display:none" onchange="loadConfig(event)"></label>
-        <button onclick="clearConfig()" title="Reset to defaults" style="padding:8px 10px;background:none;border:1px solid var(--border);color:var(--muted);font-family:'Sora',sans-serif;font-size:10px;font-weight:600;border-radius:7px;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">↺</button>
-      </div>
       <button class="run-btn" id="run-btn" onclick="processFiles()" disabled>Generate Report</button>
       <div class="recalc-note" id="recalc-note">Upload both files to generate</div>
     </div>
@@ -684,27 +703,78 @@ function clearConfig(){
   localStorage.removeItem('ot-allowance-config');
   location.reload();
 }
-function saveConfig(){
-  const config={version:'v1',allowanceTypes:allowanceTypes,eligFilters:eligFilters,computeMode:computeMode};
-  try{localStorage.setItem('ot-allowance-config',JSON.stringify(config));}catch(e){if(typeof showToast==='function')showToast('An error occurred: '+e.message,'warning',3000);}
-  const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download='OT_Allowance_Config_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+var V1_CONFIGS_KEY='ot-allowance-named-configs';
+function getAllConfigsV1(){try{return JSON.parse(localStorage.getItem(V1_CONFIGS_KEY)||'{}');}catch(e){return {};}}
+function setAllConfigsV1(obj){try{localStorage.setItem(V1_CONFIGS_KEY,JSON.stringify(obj));}catch(e){}}
+function buildSnapshotV1(){return{version:'v1',allowanceTypes:JSON.parse(JSON.stringify(allowanceTypes)),eligFilters:JSON.parse(JSON.stringify(eligFilters)),computeMode:computeMode};}
+function applySnapshotV1(cfg){
+  if(!cfg||cfg.version!=='v1')return;
+  if(cfg.allowanceTypes)allowanceTypes=cfg.allowanceTypes;
+  if(cfg.eligFilters)eligFilters=cfg.eligFilters;
+  if(cfg.computeMode&&['perday','shifttype','accumulated'].includes(cfg.computeMode))setCompMode(cfg.computeMode);
+  renderAllowanceTypes();renderEligFilters();
 }
-function loadConfig(e){
-  const file=e.target.files[0];if(!file)return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    try{
-      const cfg=JSON.parse(ev.target.result);
-      if(cfg.version!=='v1'){showToast('This config file is not compatible with this version.','error',5000);return;}
-      if(cfg.allowanceTypes)allowanceTypes=cfg.allowanceTypes;
-      if(cfg.eligFilters)eligFilters=cfg.eligFilters;
-      renderAllowanceTypes();renderEligFilters();showToast('Config loaded successfully.','success',3000);
-    }catch(err){showToast('Invalid config file. Please use a valid config JSON.','error',4000);}
-  };
-  r.readAsText(file);e.target.value='';
+function updateCfgLabelV1(name){var el=document.getElementById('config-label');if(el)el.textContent=name?'Loaded: '+name:'';}
+function saveConfigNamed(){
+  var configs=getAllConfigsV1();
+  var names=Object.keys(configs);
+  var overlay=document.createElement('div');
+  overlay.className='cfg-modal-overlay';
+  overlay.innerHTML='<div class="cfg-modal"><h3>💾 Save Configuration</h3>'+
+    '<input type="text" id="cfg-save-name" placeholder="Config name (e.g. ITMI, Client A)" autocomplete="off" maxlength="60">'+
+    (names.length?'<div style="font-size:9px;color:var(--muted);margin:-4px 0 10px;">Existing: '+names.join(', ')+'</div>':'')+
+    '<div class="cfg-modal-btns"><button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Cancel</button>'+
+    '<button class="cfg-modal-save-btn" onclick="doSaveConfigV1()">Save</button></div></div>';
+  document.body.appendChild(overlay);
+  var inp=document.getElementById('cfg-save-name');if(inp)inp.focus();
+  overlay.addEventListener('keydown',function(e){if(e.key==='Escape')overlay.remove();if(e.key==='Enter')doSaveConfigV1();});
 }
+function doSaveConfigV1(){
+  var inp=document.getElementById('cfg-save-name');
+  var name=inp?inp.value.trim():'';
+  if(!name){showToast('Please enter a name for this config.','warning',3000);return;}
+  var configs=getAllConfigsV1();
+  configs[name]={snapshot:buildSnapshotV1(),savedAt:new Date().toLocaleString()};
+  setAllConfigsV1(configs);
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  updateCfgLabelV1(name);
+  showToast('Config "'+name+'" saved.','success',3000);
+}
+function loadConfigNamed(){
+  var configs=getAllConfigsV1();
+  var names=Object.keys(configs);
+  var overlay=document.createElement('div');
+  overlay.className='cfg-modal-overlay';
+  var listHtml=names.length?names.map(function(n){
+    var c=configs[n];
+    return '<div class="cfg-list-item" onclick="doLoadConfigV1(\''+esc(n)+'\')">'+
+      '<div><div class="cfg-list-item-name">'+esc(n)+'</div><div class="cfg-list-item-date">Saved: '+(c.savedAt||'')+'</div></div>'+
+      '<button class="cfg-list-item-del" onclick="event.stopPropagation();doDeleteConfigV1(\''+esc(n)+'\')">✕</button></div>';
+  }).join(''):'<div style="font-size:11px;color:var(--muted);padding:12px 0;">No saved configs yet — save one first.</div>';
+  overlay.innerHTML='<div class="cfg-modal"><h3>📂 Load Configuration</h3>'+listHtml+
+    '<div class="cfg-modal-btns" style="margin-top:8px;"><button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Close</button></div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('keydown',function(e){if(e.key==='Escape')overlay.remove();});
+}
+function doLoadConfigV1(name){
+  var configs=getAllConfigsV1();
+  var c=configs[name];
+  if(!c||!c.snapshot){showToast('Config "'+name+'" not found.','error',3000);return;}
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  applySnapshotV1(c.snapshot);
+  updateCfgLabelV1(name);
+  showToast('Config "'+name+'" loaded.','success',3000);
+}
+function doDeleteConfigV1(name){
+  var configs=getAllConfigsV1();
+  delete configs[name];
+  setAllConfigsV1(configs);
+  document.querySelector('.cfg-modal-overlay')?.remove();
+  showToast('Config "'+name+'" deleted.','success',2000);
+  setTimeout(loadConfigNamed,150);
+}
+function saveConfig(){saveConfigNamed();}
+function loadConfig(){loadConfigNamed();}
 function autoSaveConfig(){
   try{localStorage.setItem('ot-allowance-config',JSON.stringify({version:'v1',allowanceTypes:allowanceTypes,eligFilters:eligFilters,computeMode:computeMode}));}catch(e){showToast('Could not auto-save config.','warning',2000);}
 }
