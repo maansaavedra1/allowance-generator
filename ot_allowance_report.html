@@ -961,6 +961,47 @@ function classifyShift(shift){
   return 'Regular';
 }
 
+// ─── OT window: the part of the actual log that is OT, not the whole log ───
+function parseClock(str){
+  // Every "hh:mm AM/PM" in the string, as minutes since midnight
+  const out=[];
+  const re=/(\d{1,2}):(\d{2})\s*([AP])M/gi;
+  let m;
+  while((m=re.exec(String(str||'')))){
+    let h=parseInt(m[1],10)%12;
+    if(m[3].toUpperCase()==='P')h+=12;
+    out.push(h*60+parseInt(m[2],10));
+  }
+  return out;
+}
+function fmtClock(mins){
+  const t=((mins%1440)+1440)%1440;
+  const h24=Math.floor(t/60),mm=t%60;
+  const h12=h24%12===0?12:h24%12;
+  return String(h12).padStart(2,'0')+':'+String(mm).padStart(2,'0')+' '+(h24>=12?'PM':'AM');
+}
+function otWindowText(d){
+  const logs=parseClock(d.biologs);
+  // Can't read the log → show it as-is rather than guess
+  if(logs.length<2||logs.length%2!==0)return d.biologs;
+  // Rest day / holiday / no scheduled shift: the whole actual log is OT
+  if(d.shiftType!=='Regular')return d.biologs;
+  const sh=parseClock(d.shift);
+  if(sh.length<2)return d.biologs;
+  const sStart=sh[0];
+  let sEnd=sh[1];
+  if(sEnd<=sStart)sEnd+=1440;                 // overnight shift
+  const inT=logs[0];                          // first clock-in
+  let outT=logs[logs.length-1];               // last clock-out
+  while(outT<=inT)outT+=1440;                 // clocked out after midnight
+  const wins=[];
+  if(inT<sStart)wins.push([inT,Math.min(sStart,outT)]);   // early-in OT
+  if(outT>sEnd)wins.push([Math.max(sEnd,inT),outT]);      // after-shift OT
+  const real=wins.filter(([a,b])=>b>a);
+  if(!real.length)return d.biologs;           // nothing detectable → keep the log
+  return real.map(([a,b])=>fmtClock(a)+' TO '+fmtClock(b)).join(', ');
+}
+
 // ════════════════════════════════════════════
 // PARSE HELPERS
 // ════════════════════════════════════════════
@@ -1389,7 +1430,7 @@ function renderTable(){
             <td>${d.day}</td>
             <td style="max-width:200px;font-size:9px;">
               <div style="color:var(--muted)">${esc(d.shift)}</div>
-              <div style="margin-top:2px;color:${d.biologs&&d.biologs.toUpperCase()!=='NO LOGS'?'var(--accent)':'#dc2626'};font-weight:600">${esc(d.biologs||'NO LOGS')}</div>
+              <div style="margin-top:2px;color:${d.biologs&&d.biologs.toUpperCase()!=='NO LOGS'?'var(--accent)':'#dc2626'};font-weight:600">${esc(d.biologs?otWindowText(d):'NO LOGS')}</div>
             </td>
             <td style="font-size:9px">${computeMode==='perday'?(typeBreakdown||'<span style="color:var(--muted)">—</span>'):computeMode==='shifttype'?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:${d.shiftType==='Regular'?'#16a34a':d.shiftType==='Rest Day'?'#ca8a04':'#dc2626'};font-weight:600">${toHHMM(d.totalOT)} <span style="font-weight:400;color:var(--muted)">${d.shiftType||'Regular'}</span></span>`:`<span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent2)">${toHHMM(d.totalOT)} OT rendered</span>`}</td>
             ${computeMode==='perday'?`<td class="r">${d.dayAllow>0?'<span style="font-family:\'DM Mono\',monospace;font-weight:700;color:var(--accent)">₱'+d.dayAllow.toLocaleString()+'</span>':'<span style="color:var(--muted)">₱0</span>'}</td>`:'<td class="r" style="color:var(--muted);font-style:italic;font-size:9px">—</td>'}
@@ -1430,7 +1471,7 @@ function renderTable(){
           <div class="detail-title">OT Days · ${r.name}</div>
           <table class="day-table" style="margin-bottom:14px">
             <thead><tr>
-              <th>Date</th><th>Day</th><th>Shift / Actual Logs</th><th>Breakdown</th><th class="r">Day Allow</th>
+              <th>Date</th><th>Day</th><th>Shift / OT Hours</th><th>Breakdown</th><th class="r">Day Allow</th>
             </tr></thead>
             <tbody>${dayRows}</tbody>
           </table>
