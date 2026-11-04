@@ -221,10 +221,8 @@ body{padding:10px;}
   .emp-name{font-weight:600;}
   .emp-id{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;}
   .grade-badge{display:inline-block;background:rgba(74,222,128,.12);color:var(--accent);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(74,222,128,.25);}
-  .status-badge{display:inline-block;font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;}
-  .s-reg{background:rgba(56,189,248,.12);color:var(--accent2);}
-  .s-pro{background:rgba(245,158,11,.12);color:var(--accent3);}
-  .s-oth{background:rgba(107,116,148,.15);color:var(--muted);}
+  /* Status bubble matches the grade bubble — same colour for every status */
+  .status-badge{display:inline-block;background:rgba(74,222,128,.12);color:var(--accent);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(74,222,128,.25);}
   .allow-val{font-family:'DM Mono',monospace;font-weight:700;}
   .allow-zero{color:var(--muted);}
 
@@ -980,6 +978,11 @@ function fmtClock(mins){
   const h12=h24%12===0?12:h24%12;
   return String(h12).padStart(2,'0')+':'+String(mm).padStart(2,'0')+' '+(h24>=12?'PM':'AM');
 }
+function dayOtColor(d){
+  // Palette colour of the first allowance type with OT on this day (user-chosen)
+  const at=allowanceTypes.find(a=>((d.byType||{})[a.id]||0)>0);
+  return at?at.color:'var(--accent)';
+}
 function otWindowText(d){
   const logs=parseClock(d.biologs);
   // Can't read the log → show it as-is rather than guess
@@ -1430,9 +1433,9 @@ function renderTable(){
             <td>${d.day}</td>
             <td style="max-width:200px;font-size:9px;">
               <div style="color:var(--muted)">${esc(d.shift)}</div>
-              <div style="margin-top:2px;color:${d.biologs&&d.biologs.toUpperCase()!=='NO LOGS'?'var(--accent)':'#dc2626'};font-weight:600">${esc(d.biologs?otWindowText(d):'NO LOGS')}</div>
+              <div style="margin-top:2px;color:${d.biologs&&d.biologs.toUpperCase()!=='NO LOGS'?dayOtColor(d):'#dc2626'};font-weight:600">${esc(d.biologs?otWindowText(d):'NO LOGS')}</div>
             </td>
-            <td style="font-size:9px">${computeMode==='perday'?(typeBreakdown||'<span style="color:var(--muted)">—</span>'):computeMode==='shifttype'?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:${d.shiftType==='Regular'?'#16a34a':d.shiftType==='Rest Day'?'#ca8a04':'#dc2626'};font-weight:600">${toHHMM(d.totalOT)} <span style="font-weight:400;color:var(--muted)">${d.shiftType||'Regular'}</span></span>`:`<span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent2)">${toHHMM(d.totalOT)} OT rendered</span>`}</td>
+            <td style="font-size:9px">${computeMode==='perday'?(typeBreakdown||'<span style="color:var(--muted)">—</span>'):computeMode==='shifttype'?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:${d.shiftType==='Regular'?'#16a34a':d.shiftType==='Rest Day'?'#ca8a04':'#dc2626'};font-weight:600">${toHHMM(d.totalOT)} <span style="font-weight:400;color:var(--muted)">${d.shiftType||'Regular'}</span></span>`:`<span style="font-family:'DM Mono',monospace;font-size:9px;color:${dayOtColor(d)}">${toHHMM(d.totalOT)} OT rendered</span>`}</td>
             ${computeMode==='perday'?`<td class="r">${d.dayAllow>0?'<span style="font-family:\'DM Mono\',monospace;font-weight:700;color:var(--accent)">₱'+d.dayAllow.toLocaleString()+'</span>':'<span style="color:var(--muted)">₱0</span>'}</td>`:'<td class="r" style="color:var(--muted);font-style:italic;font-size:9px">—</td>'}
           </tr>`;
         }).join('')
