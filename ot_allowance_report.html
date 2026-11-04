@@ -1651,7 +1651,35 @@ async function exportAdjustmentFromTemplate(rows,file){
     }
   }
 
-  if(filled===0){
+  // Employees with real allowance who aren't a row in the uploaded template at all
+  // (new hire, ID mismatch, template doesn't list them) used to be dropped silently.
+  // Append them as new rows instead of losing them.
+  const listedIds=new Set(templateRows.filter(t=>!t.isSample).map(t=>t.empId.toLowerCase()).filter(Boolean));
+  let addedNew=0;
+  for(const r of rows){
+    const key=r.employee_id.trim().toLowerCase();
+    if(r.totalAllow>0&&!listedIds.has(key)){
+      const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
+        .map(at=>at.name+': '+toHHMM(r.totalOTByType[at.id]||0)).join(' | ');
+      withData.push({
+        empId:r.employee_id,
+        rowData:{
+          1:{t:'s',v:String(r.employee_id),s:{font:DATA_FONT}},
+          2:{t:'s',v:r.name,s:{font:DATA_FONT}},
+          3:{t:'s',v:mf.adjType,s:{font:DATA_FONT}},
+          4:{t:'s',v:mf.adjName,s:{font:DATA_FONT}},
+          5:{t:'s',v:mf.adjCode,s:{font:DATA_FONT}},
+          6:{t:'n',v:r.totalAllow,s:{font:DATA_FONT}},
+          7:{t:'s',v:remarks,s:{font:DATA_FONT}},
+          8:{t:'s',v:mf.beforeTax,s:{font:DATA_FONT}},
+          9:{t:'s',v:mf.taxable,s:{font:DATA_FONT}},
+        }
+      });
+      addedNew++;
+    }
+  }
+
+  if(filled===0&&listedIds.size>0){
     showToast('No employees matched the template. Make sure you\'re using the correct payroll period template.','error',9000);
     return;
   }
@@ -1680,9 +1708,10 @@ async function exportAdjustmentFromTemplate(rows,file){
   ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:range.e.c}});
   XLSX.writeFile(wb,'AdjustmentTemplate_OTAllowance_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
   logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+  const addedTxt=addedNew>0?' '+addedNew+' added \u2014 not in the uploaded template.':'';
   showToast(hideZero
-    ? filled+' employee(s) with allowance exported. '+withoutData.length+' without data excluded.'
-    : filled+' employee(s) with allowance exported. '+withoutData.length+' without data grouped below.','success',6000);
+    ? (filled+addedNew)+' employee(s) with allowance exported.'+addedTxt+' '+withoutData.length+' without data excluded.'
+    : (filled+addedNew)+' employee(s) with allowance exported.'+addedTxt+' '+withoutData.length+' without data grouped below.','success',7000);
 }
 
 function exportAdjustmentEmbedded(rows){
