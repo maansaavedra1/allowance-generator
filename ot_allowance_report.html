@@ -365,6 +365,8 @@ body{padding:10px;}
         <div class="modal-field"><label>Apply Before Tax</label><select id="m-adj-before-tax"><option value="No" selected>No</option><option value="Yes">Yes</option></select></div>
         <div class="modal-field"><label>Is Taxable</label><select id="m-adj-taxable"><option value="Yes" selected>Yes</option><option value="No">No</option></select></div>
       </div>
+      <div class="modal-section-label">Payout</div>
+      <div class="modal-field"><label>Adjustment Date</label><input id="m-adj-date" type="date"></div>
       <div class="modal-preview" id="adj-modal-preview"></div>
     </div>
     <div class="modal-actions">
@@ -536,7 +538,7 @@ body{padding:10px;}
 // ════════════════════════════════════════════
 let sortField='name', sortDir='asc';
 let computeMode='perday';
-let empFile=null, attFile=null, allRecords=[], empRows=[], empColumns=[], attColumns=[];
+let empFile=null, attFile=null, allRecords=[], empRows=[], empColumns=[], attColumns=[], hasPayrollTypeCol=false;
 let eligFilters=[];
 
 // Allowance types — user-defined
@@ -660,6 +662,7 @@ function openAdjModal(){
     if(saved.beforeTax)document.getElementById('m-adj-before-tax').value=saved.beforeTax;
     if(saved.taxable)document.getElementById('m-adj-taxable').value=saved.taxable;
   }catch(e){if(typeof showToast==='function')showToast('An error occurred. Please try again.','warning',3000);}
+  document.getElementById('m-adj-date').value=adjTodayISO();   // always starts as today, never a stale saved date
   updateAdjModalPreview();
   document.getElementById('adj-modal').classList.add('open');
 }
@@ -675,20 +678,225 @@ function getAdjModalFields(){
     taxable:document.getElementById('m-adj-taxable').value,
   };
   try{localStorage.setItem('adj-modal-config',JSON.stringify(fields));}catch(e){if(typeof showToast==='function')showToast('An error occurred. Please try again.','warning',3000);}
-  return fields;
+  const dEl=document.getElementById('m-adj-date');
+  return {...fields,adjDate:adjDateMMDDYYYY(dEl&&dEl.value)||adjDateMMDDYYYY(adjTodayISO())};
 }
 function updateAdjModalPreview(){
   const f=getAdjModalFields();
   const el=document.getElementById('adj-modal-preview');
-  if(el)el.innerHTML='Each row will be written as: <b>'+f.adjType+'</b> — <b>'+f.adjName+'</b> (code <b>'+f.adjCode+'</b>), before-tax: <b>'+f.beforeTax+'</b>, taxable: <b>'+f.taxable+'</b>.';
+  if(el)el.innerHTML='Each row will be written as: <b>'+f.adjType+'</b> — <b>'+f.adjName+'</b> (code <b>'+f.adjCode+'</b>), before-tax: <b>'+f.beforeTax+'</b>, taxable: <b>'+f.taxable+'</b>, date: <b>'+f.adjDate+'</b>.';
 }
 document.getElementById('adj-modal').addEventListener('input', updateAdjModalPreview);
-function confirmAdjExport(){
+// ════════════════════════════════════════════
+// ADJUSTMENT TEMPLATE EXPORT (Payrollpie "Import Adjustment")
+//  • columns are matched by header name, so both the older 10-column template and
+//    the current 18-column one (sheet "ProcessEmployeeImportAdjustment") work
+//  • one file per payroll type: Daily-paid and Monthly-paid are never mixed
+// ════════════════════════════════════════════
+const ADJ_FONT={name:'Calibri',sz:11};
+const ADJ_DEFAULT_RUN_TYPE='Normal/FinalPay/SpecialRun';
+// column key → the header text that column starts with (lower-case)
+const ADJ_COLS={status:'status',id:'employee id',name:'employee name',type:'adjustment type',adjName:'adjustment name',code:'adjustment code',date:'adjustment date',amount:'adjustment amount',remarks:'remarks',beforeTax:'apply before tax',taxable:'is taxable',runType:'payroll run type'};
+
+function classifyPayrollGroup(pt){
+  const p=String(pt||'').trim().toLowerCase();
+  if(p==='daily'||p==='hourly')return 'daily';
+  if(p==='monthly'||p==='semi-monthly'||p==='semimonthly'||p==='semi monthly')return 'monthly';
+  return null;
+}
+function adjNorm(v){return String(v==null?'':v).replace(/\s+/g,' ').trim().toLowerCase();}
+function adjCellVal(ws,r,c){const x=ws[XLSX.utils.encode_cell({r,c})];return x&&x.v!==undefined?x.v:'';}
+function adjTodayISO(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function adjDateMMDDYYYY(iso){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(iso||'');return m?m[2]+'/'+m[3]+'/'+m[1]:'';}
+
+// Built-in template (same layout as the Payrollpie file) used when no template is uploaded
+function adjDefaultWorkbook(){
+  const headers=['STATUS','Employee ID','Employee Name','Adjustment Type','Adjustment Name','Adjustment Code','Adjustment Date (mm/dd/yyyy)','Adjustment Amount','Remarks','Apply Before Tax','Is Taxable','Maximum Amount','Amount will  be divided per Period(Yes/No)','Apply Period','Has Monthly Limit','Date Issued (mm/dd/yyyy)','Principal Amount','Payroll Run Type'];
+  const note=[];note[11]='Negative amount (-) if loan';
+  const sample=['SAMPLE DATA','E0000001','Juan Dela Cruz','Allowance','Allowance','Allowance','01/01/2018',1000,'Allowance','Yes','Yes',10000,'No',1,'No','01/01/2018',10000,ADJ_DEFAULT_RUN_TYPE];
+  const title='Payrollpie One time adjustment worksheet: Fill out the fields below.  Then, upload this file to the \u201CUPLOAD ADJUSTMENTS\u201D section of Payrollpie';
+  const ws=XLSX.utils.aoa_to_sheet([[title],headers,note,sample]);
+  ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:17}}];
+  ws['!cols']=[14,16,20,21,22,21,39,25,11,21,12,25,52,23,18,32,21,27].map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'ProcessEmployeeImportAdjustment');
+  return wb;
+}
+
+// Read a template workbook: find the sheet, the header row, the columns, and the rows
+function adjReadTemplate(wb){
+  const sheetName=wb.SheetNames.find(n=>/import\s*adjustment/i.test(n));
+  if(!sheetName)return {error:'nosheet',sheets:wb.SheetNames.slice()};
+  const ws=wb.Sheets[sheetName];
+  if(!ws||!ws['!ref'])return {error:'noheader',sheetName};
+  const range=XLSX.utils.decode_range(ws['!ref']);
+  let headerRow=-1;
+  for(let r=range.s.r;r<=Math.min(range.e.r,range.s.r+9)&&headerRow<0;r++){
+    for(let c=range.s.c;c<=range.e.c;c++){
+      if(adjNorm(adjCellVal(ws,r,c))==='employee id'){headerRow=r;break;}
+    }
+  }
+  if(headerRow<0)return {error:'noheader',sheetName};
+  const cols={};
+  for(const [key,start] of Object.entries(ADJ_COLS)){
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const h=adjNorm(adjCellVal(ws,headerRow,c));
+      if(h===start||h.startsWith(start)){cols[key]=c;break;}
+    }
+  }
+  const missing=['id','name','amount'].filter(k=>cols[k]===undefined);
+  if(missing.length)return {error:'nocols',sheetName,missing:missing.map(k=>({id:'Employee ID',name:'Employee Name',amount:'Adjustment Amount'}[k]))};
+
+  // rows under the header: fixed rows (notes / SAMPLE DATA) stay on top, employee rows follow
+  const fixed=[],tplRows=[];
+  let seenEmp=false;
+  for(let r=headerRow+1;r<=range.e.r;r++){
+    const rowData={};
+    let hasVal=false;
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const cell=ws[XLSX.utils.encode_cell({r,c})];
+      if(cell){rowData[c]={...cell};if(cell.v!==undefined&&String(cell.v).trim()!=='')hasVal=true;}
+    }
+    if(!hasVal)continue;                       // blank / formatting-only row
+    const status=cols.status!==undefined?String(adjCellVal(ws,r,cols.status)):'';
+    const empId=String(adjCellVal(ws,r,cols.id)).trim();
+    if(/sample/i.test(status)){fixed.push(rowData);continue;}
+    if(!empId){if(!seenEmp)fixed.push(rowData);continue;}
+    seenEmp=true;
+    tplRows.push({empId,rowData});
+  }
+  return {wb,ws,sheetName,range,headerRow,cols,fixed,tplRows};
+}
+
+function adjRemarks(r){
+  return allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
+    .map(at=>at.name+': '+toHHMM(r.totalOTByType[at.id]||0)).join(' | ');
+}
+function adjFillRow(rowData,cols,r,mf){
+  const put=(k,v,t)=>{if(cols[k]!==undefined)rowData[cols[k]]={t,v,s:{font:ADJ_FONT}};};
+  put('type',mf.adjType,'s');
+  put('adjName',mf.adjName,'s');
+  put('code',mf.adjCode,'s');
+  put('date',mf.adjDate,'s');
+  put('amount',r.totalAllow,'n');
+  put('remarks',adjRemarks(r),'s');
+  put('beforeTax',mf.beforeTax,'s');
+  put('taxable',mf.taxable,'s');
+  put('runType',ADJ_DEFAULT_RUN_TYPE,'s');
+}
+
+// Decide which rows go in the file for ONE payroll group
+function adjBuildOutput(tpl,rows,mf,hideZero){
+  const cols=tpl.cols;
+  const key=v=>String(v).trim().toLowerCase();
+  const byId=new Map(rows.map(r=>[key(r.employee_id),r]));
+  const listed=new Set(tpl.tplRows.map(t=>key(t.empId)));
+  const preListed=tpl.tplRows.length>0;        // older templates come with employees already listed
+  const withData=[],withoutData=[],zeroNew=[];
+  let matched=0,added=0;
+
+  for(const t of tpl.tplRows){
+    const r=byId.get(key(t.empId));
+    if(!r)continue;                            // belongs to the other payroll group (or isn't in the report)
+    if(r.totalAllow>0){adjFillRow(t.rowData,cols,r,mf);withData.push(t.rowData);matched++;}
+    else withoutData.push(t.rowData);
+  }
+  // Employees who aren't a row in the template at all get appended, never dropped
+  for(const r of rows){
+    if(listed.has(key(r.employee_id)))continue;
+    const hasAllow=r.totalAllow>0;
+    if(!hasAllow&&(preListed||hideZero))continue;
+    const rd={};
+    rd[cols.id]={t:'s',v:String(r.employee_id),s:{font:ADJ_FONT}};
+    rd[cols.name]={t:'s',v:r.name,s:{font:ADJ_FONT}};
+    adjFillRow(rd,cols,r,mf);
+    (hasAllow?withData:zeroNew).push(rd);
+    if(hasAllow)added++;
+  }
+  const out=hideZero?[...withData]:[...withData,...withoutData,...zeroNew];
+  return {out,matched,added,preListed,withoutCount:withoutData.length,exported:withData.length};
+}
+
+function adjWriteSheet(tpl,outRows){
+  const {ws,range,headerRow}=tpl;
+  for(let r=headerRow+1;r<=range.e.r;r++){
+    for(let c=range.s.c;c<=range.e.c;c++){const a=XLSX.utils.encode_cell({r,c});if(ws[a])delete ws[a];}
+  }
+  let rowIdx=headerRow+1;
+  for(const rd of [...tpl.fixed,...outRows]){
+    for(const [c,cell] of Object.entries(rd))ws[XLSX.utils.encode_cell({r:rowIdx,c:parseInt(c)})]={...cell};
+    rowIdx++;
+  }
+  ws['!ref']=XLSX.utils.encode_range({s:{r:range.s.r,c:range.s.c},e:{r:Math.max(rowIdx-1,headerRow),c:range.e.c}});
+}
+
+function adjErrorText(e){
+  if(e.error==='nosheet')return 'Heads up! This doesn\'t look like a Payrollpie Import Adjustment template \u2014 no "Import Adjustment" sheet was found (sheets in your file: '+e.sheets.join(', ')+'). Extract the template from Sprout Payroll and upload it again.';
+  if(e.error==='noheader')return 'Heads up! Couldn\'t find the "Employee ID" header row in the sheet "'+(e.sheetName||'')+'". Please upload the unedited Import Adjustment template from Sprout Payroll.';
+  if(e.error==='nocols')return 'Heads up! The template is missing required column(s): '+e.missing.join(', ')+'. Please upload the unedited Import Adjustment template from Sprout Payroll.';
+  if(e.error==='nomatch')return 'Heads up! None of the employees with allowance are listed in this template. Make sure you\'re using the template for the correct payroll period.';
+  return 'Something went wrong while building the Adjustment Template. Please try again.';
+}
+
+async function confirmAdjExport(){
   closeAdjModal();
   const rows=getFiltered();
-  if(!rows.length){showToast('No employees with allowance to export.','warning');return;}
-  if(adjFile){exportAdjustmentFromTemplate(rows,adjFile);}
-  else{exportAdjustmentEmbedded(rows);}
+  if(!rows.length){showToast('No employees match the current filters.','warning');return;}
+  if(!hasPayrollTypeCol){
+    showToast('Heads up! The Employee List has no Payroll Type column, so employees can\'t be split into Daily-paid and Monthly-paid files. Export the Employee List from Sprout HR with Payroll Type included and try again.','error',9000);
+    return;
+  }
+  const hideZero=!!(document.getElementById('hide-zero')&&document.getElementById('hide-zero').checked);
+  const mf=getAdjModalFields();
+
+  // Daily and Monthly are never mixed in one file (Hourly counts as Daily, Semi-Monthly as Monthly)
+  const daily=[],monthly=[],skipped=[];
+  for(const r of rows){
+    const g=classifyPayrollGroup(r.payrollType);
+    if(g==='daily')daily.push(r);
+    else if(g==='monthly')monthly.push(r);
+    else if(r.totalAllow>0)skipped.push(r.name||r.employee_id);
+  }
+  const jobs=[];
+  if(daily.length)jobs.push({label:'DailyPaid',title:'Daily-paid',rows:daily});
+  if(monthly.length)jobs.push({label:'MonthlyPaid',title:'Monthly-paid',rows:monthly});
+  if(!jobs.length){
+    showToast('Nothing to export \u2014 no employees have a Daily/Hourly or Monthly/Semi-Monthly Payroll Type.','error',6000);
+    return;
+  }
+
+  try{
+    // build every file first, so a bad template stops the export before anything downloads
+    for(const j of jobs){
+      const wb=adjFile?await readWb(adjFile):adjDefaultWorkbook();
+      j.tpl=adjReadTemplate(wb);
+      if(j.tpl.error){showToast(adjErrorText(j.tpl),'error',9000);return;}
+      j.res=adjBuildOutput(j.tpl,j.rows,mf,hideZero);
+    }
+    if(jobs[0].tpl.tplRows.length>0&&jobs.every(j=>j.res.matched===0)){
+      showToast(adjErrorText({error:'nomatch'}),'error',9000);
+      return;
+    }
+    const stamp=new Date().toISOString().slice(0,10);
+    for(const j of jobs){
+      adjWriteSheet(j.tpl,j.res.out);
+      XLSX.writeFile(j.tpl.wb,'AdjustmentTemplate_OTAllowance_'+j.label+'_'+stamp+'.xlsx',{cellStyles:true});
+    }
+    logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
+
+    const part=l=>{const j=jobs.find(x=>x.label===l);return j?j.res.exported:0;};
+    const added=jobs.reduce((s,j)=>s+(j.res.preListed?j.res.added:0),0);
+    const without=jobs.reduce((s,j)=>s+j.res.withoutCount,0);
+    let msg='Exported '+part('DailyPaid')+' Daily-paid and '+part('MonthlyPaid')+' Monthly-paid employee(s) into '+jobs.length+' file(s).';
+    if(added>0)msg+=' '+added+' added \u2014 not in the uploaded template.';
+    if(without>0)msg+=' '+without+' without data '+(hideZero?'excluded':'grouped below')+'.';
+    showToast(msg,'success',7000);
+    if(skipped.length){
+      showToast(skipped.length+' employee(s) with allowance were left out \u2014 no Payroll Type set (or an unrecognized one) in the Employee List: '+skipped.slice(0,5).join(', ')+(skipped.length>5?', \u2026':'')+'.','warning',10000);
+    }
+  }catch(err){
+    showToast('Something went wrong while building the Adjustment Template. Please try again.','error',6000);
+  }
 }
 // Close modal on overlay click
 document.addEventListener('click',function(e){
@@ -1252,6 +1460,8 @@ async function processFiles(){
     const posCol   =findCol(smp,['Position','Job Title','Designation']);
     const gradeCol =findCol(smp,['Job Grade','JobGrade','Job Level','JobLevel','Level','Grade']);
     const statusCol=findCol(smp,['Employee Status','EmpStatus','Status','Employment Status']);
+    const payTypeCol=findCol(smp,['Payroll Type','PayrollType']);
+    hasPayrollTypeCol=!!payTypeCol;
 
     const eligible=empRows.filter(r=>{
       for(const f of eligFilters){if(!f.values.length)continue;const v=String(r[f.col]||'').trim();if(!f.values.includes(v))return false;}
@@ -1312,6 +1522,7 @@ async function processFiles(){
         position:String(emp[posCol]||'—'),
         job_grade:gradeCol?parseFloat(emp[gradeCol]):0,
         status:String(emp[statusCol]||'—'),
+        payrollType:payTypeCol?String(emp[payTypeCol]||'').trim():'',
         days_present:parseInt(sumRow['Days Present']||0)||0,
         days:detDayMap[empId]||[],
         shiftRawTotals,
@@ -1578,188 +1789,6 @@ function exportExcel(){
   logExport('Excel Summary', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
 }
 
-
-// ════════════════════════════════════════════
-// EXPORT ADJUSTMENT TEMPLATE
-// ════════════════════════════════════════════
-function exportAdjustment(){
-  const rows=getFiltered();
-  if(!rows.length){showToast('No employees with allowance data to export.','warning',4000);return;}
-
-  // If user uploaded a fresh Payrollpie template, use it (fill in-place)
-  if(adjFile){
-    exportAdjustmentFromTemplate(rows,adjFile);
-  } else {
-    exportAdjustmentEmbedded(rows);
-  }
-}
-
-async function exportAdjustmentFromTemplate(rows,file){
-  const wb=await readWb(file);
-  const ws=wb.Sheets['ProcessPayrollImportAdjustment'];
-  if(!ws){showToast('Sheet "ProcessPayrollImportAdjustment" not found.','error');return;}
-
-  const DATA_FONT={name:'Calibri',sz:11};
-  const range=XLSX.utils.decode_range(ws['!ref']);
-
-  // Read all pre-filled rows from template (row 2 onwards)
-  const templateRows=[];
-  for(let r=2;r<=range.e.r;r++){
-    const rowData={};
-    for(let c=0;c<=range.e.c;c++){
-      const addr=XLSX.utils.encode_cell({r,c});
-      if(ws[addr])rowData[c]={...ws[addr]};
-    }
-    const statusCell=ws[XLSX.utils.encode_cell({r,c:0})];
-    const isSample=statusCell&&String(statusCell.v||'').includes('SAMPLE');
-    const idCell=ws[XLSX.utils.encode_cell({r,c:1})];
-    const empId=idCell&&idCell.v!==undefined?String(idCell.v).trim():'';
-    if(isSample){templateRows.push({empId,rowData,isSample:true});continue;}
-    templateRows.push({empId,rowData});
-  }
-
-  // Build lookup: which employees have allowances
-  const allowanceMap={};
-  for(const r of rows){
-    allowanceMap[r.employee_id.trim().toLowerCase()]=r;
-  }
-
-  const mf=getAdjModalFields();
-  let filled=0,missed=[];
-
-  // Separate into two groups: with data, without data
-  const withData=[], withoutData=[];
-  for(const tr of templateRows.filter(t=>!t.isSample)){
-    const key=tr.empId.toLowerCase();
-    const r=allowanceMap[key];
-    if(r&&r.totalAllow>0){
-      // Fill allowance data into row
-      const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
-        .map(at=>at.name+': '+toHHMM(r.totalOTByType[at.id]||0)).join(' | ');
-      tr.rowData[3]={t:'s',v:mf.adjType,s:{font:DATA_FONT}};
-      tr.rowData[4]={t:'s',v:mf.adjName,s:{font:DATA_FONT}};
-      tr.rowData[5]={t:'s',v:mf.adjCode,s:{font:DATA_FONT}};
-      tr.rowData[6]={t:'n',v:r.totalAllow,s:{font:DATA_FONT}};
-      tr.rowData[7]={t:'s',v:remarks,s:{font:DATA_FONT}};
-      tr.rowData[8]={t:'s',v:mf.beforeTax,s:{font:DATA_FONT}};
-      tr.rowData[9]={t:'s',v:mf.taxable,s:{font:DATA_FONT}};
-      withData.push(tr);
-      filled++;
-    } else {
-      withoutData.push(tr);
-      if(tr.empId)missed.push(tr.empId);
-    }
-  }
-
-  // Employees with real allowance who aren't a row in the uploaded template at all
-  // (new hire, ID mismatch, template doesn't list them) used to be dropped silently.
-  // Append them as new rows instead of losing them.
-  const listedIds=new Set(templateRows.filter(t=>!t.isSample).map(t=>t.empId.toLowerCase()).filter(Boolean));
-  let addedNew=0;
-  for(const r of rows){
-    const key=r.employee_id.trim().toLowerCase();
-    if(r.totalAllow>0&&!listedIds.has(key)){
-      const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
-        .map(at=>at.name+': '+toHHMM(r.totalOTByType[at.id]||0)).join(' | ');
-      withData.push({
-        empId:r.employee_id,
-        rowData:{
-          1:{t:'s',v:String(r.employee_id),s:{font:DATA_FONT}},
-          2:{t:'s',v:r.name,s:{font:DATA_FONT}},
-          3:{t:'s',v:mf.adjType,s:{font:DATA_FONT}},
-          4:{t:'s',v:mf.adjName,s:{font:DATA_FONT}},
-          5:{t:'s',v:mf.adjCode,s:{font:DATA_FONT}},
-          6:{t:'n',v:r.totalAllow,s:{font:DATA_FONT}},
-          7:{t:'s',v:remarks,s:{font:DATA_FONT}},
-          8:{t:'s',v:mf.beforeTax,s:{font:DATA_FONT}},
-          9:{t:'s',v:mf.taxable,s:{font:DATA_FONT}},
-        }
-      });
-      addedNew++;
-    }
-  }
-
-  if(filled===0&&listedIds.size>0){
-    showToast('No employees matched the template. Make sure you\'re using the correct payroll period template.','error',9000);
-    return;
-  }
-
-  // Clear all data rows in worksheet
-  for(let r=2;r<=range.e.r;r++){
-    for(let c=0;c<=range.e.c;c++){
-      const addr=XLSX.utils.encode_cell({r,c});
-      if(ws[addr])delete ws[addr];
-    }
-  }
-
-  // Write: with data first, then without data (unless hiding zero/no-data employees)
-  const hideZero=document.getElementById('hide-zero')&&document.getElementById('hide-zero').checked;
-  let rowIdx=2;
-  const sampleRows=templateRows.filter(t=>t.isSample);
-  const rowsToWrite=hideZero?[...sampleRows,...withData]:[...sampleRows,...withData,...withoutData];
-  for(const tr of rowsToWrite){
-    for(const [c,cell] of Object.entries(tr.rowData)){
-      const addr=XLSX.utils.encode_cell({r:rowIdx,c:parseInt(c)});
-      ws[addr]={...cell};
-    }
-    rowIdx++;
-  }
-
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:range.e.c}});
-  XLSX.writeFile(wb,'AdjustmentTemplate_OTAllowance_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
-  logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
-  const addedTxt=addedNew>0?' '+addedNew+' added \u2014 not in the uploaded template.':'';
-  showToast(hideZero
-    ? (filled+addedNew)+' employee(s) with allowance exported.'+addedTxt+' '+withoutData.length+' without data excluded.'
-    : (filled+addedNew)+' employee(s) with allowance exported.'+addedTxt+' '+withoutData.length+' without data grouped below.','success',7000);
-}
-
-function exportAdjustmentEmbedded(rows){
-  const ADJ_B64='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';
-  const bStr=atob(ADJ_B64);
-  const bytes=new Uint8Array(bStr.length);
-  for(let i=0;i<bStr.length;i++) bytes[i]=bStr.charCodeAt(i);
-
-  const wb=XLSX.read(bytes.buffer,{type:'array',cellStyles:true});
-  const ws=wb.Sheets['ProcessPayrollImportAdjustment'];
-
-  // Clear from row 3 onwards (keep title row 1 and header row 2)
-  const range=XLSX.utils.decode_range(ws['!ref']);
-  for(let r=2;r<=range.e.r;r++){
-    for(let c=0;c<=range.e.c;c++){
-      const addr=XLSX.utils.encode_cell({r,c});
-      if(ws[addr])delete ws[addr];
-    }
-  }
-
-  const DATA_FONT={name:'Calibri',sz:11};
-  let rowIdx=2; // row 3 (0-indexed)
-
-  for(const r of rows){
-    const remarks=allowanceTypes.filter(at=>(r.totalOTByType[at.id]||0)>0)
-      .map(at=>`${at.name}: ${toHHMM(r.totalOTByType[at.id]||0)}`).join(' | ');
-    [
-      {c:0,v:'',t:'s',s:{font:DATA_FONT}},
-      {c:1,v:r.employee_id,t:'s',s:{font:DATA_FONT}},
-      {c:2,v:r.name,t:'s',s:{font:DATA_FONT}},
-      {c:3,v:getAdjModalFields().adjType,t:'s',s:{font:DATA_FONT}},
-      {c:4,v:getAdjModalFields().adjName,t:'s',s:{font:DATA_FONT}},
-      {c:5,v:getAdjModalFields().adjCode,t:'s',s:{font:DATA_FONT}},
-      {c:6,v:r.totalAllow,t:'n',s:{font:DATA_FONT,numFmt:'#,##0.00'}},
-      {c:7,v:remarks,t:'s',s:{font:DATA_FONT}},
-      {c:8,v:getAdjModalFields().beforeTax,t:'s',s:{font:DATA_FONT}},
-      {c:9,v:getAdjModalFields().taxable,t:'s',s:{font:DATA_FONT}},
-    ].forEach(({c,v,t,s})=>{
-      const addr=XLSX.utils.encode_cell({r:rowIdx,c});
-      ws[addr]={t,v,s};
-    });
-    rowIdx++;
-  }
-
-  ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:9}});
-  XLSX.writeFile(wb,'AdjustmentTemplate_OTAllowance_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
-  logExport('Adjustment Template', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
-}
 
 // ════════════════════════════════════════════
 // EXPORT PAYROLL INSTRUCTION (CIS template)
