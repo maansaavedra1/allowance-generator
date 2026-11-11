@@ -58,11 +58,21 @@
   details.cfg[open] summary::before{transform:rotate(90deg);}
   .cfg-body{padding:0 11px 11px;}
 
-  .tier-head{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr;gap:6px;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;padding:0 10px;}
-  .tier-row{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr;gap:6px;align-items:center;padding:4px;border-radius:7px;margin-bottom:2px;transition:background .12s;}
+  .tier-head{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr 18px;gap:6px;font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;padding:0 10px;}
+  .tier-row{display:grid;grid-template-columns:2.1fr .7fr .7fr .7fr 18px;gap:6px;align-items:center;padding:4px;border-radius:7px;margin-bottom:2px;transition:background .12s;}
   .tier-row:hover{background:var(--surface2);}
   .tier-row input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:9px;padding:5px 6px;border-radius:6px;width:100%;outline:none;min-width:0;}
   .tier-row input.tier-name{font-weight:600;letter-spacing:.2px;}
+  .tier-remove{background:none;border:none;color:var(--muted);font-size:12px;line-height:1;cursor:pointer;padding:2px;border-radius:4px;opacity:.55;transition:opacity .12s,color .12s,background .12s;}
+  .tier-remove:hover{opacity:1;color:#dc2626;background:rgba(220,38,38,.1);}
+  .tier-remove:disabled{opacity:.2;cursor:not-allowed;background:none;color:var(--muted);}
+  .allow-row{display:grid;grid-template-columns:1fr 18px;gap:6px;align-items:center;padding:4px;border-radius:7px;margin-bottom:2px;transition:background .12s;}
+  .allow-row:hover{background:var(--surface2);}
+  .allow-row input{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:9px;font-weight:600;padding:5px 6px;border-radius:6px;width:100%;outline:none;min-width:0;}
+  .allow-row input:focus{border-color:var(--accent3);background:var(--bg);}
+  .allow-removed-label{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:8px 4px 4px;}
+  .allow-restore{background:var(--surface2);border:1px dashed var(--border);color:var(--text);font-family:'Sora',sans-serif;font-size:9px;font-weight:600;padding:4px 10px;border-radius:100px;cursor:pointer;margin:0 4px 4px 0;transition:border-color .12s,background .12s;}
+  .allow-restore:hover{border-color:var(--accent3);background:var(--bg);}
   .tier-row input:focus{border-color:var(--accent3);background:var(--bg);}
 
   .elig-table{width:100%;border-collapse:collapse;font-size:9px;}
@@ -307,7 +317,7 @@
   <div class="logo-badge">V3</div>
   <div>
     <h1>Daily Allowance Generator</h1>
-    <p style="font-size:11px;color:var(--muted);margin-top:2px">Food / Transportation / Hazard Pay by tier &amp; attendance eligibility</p>
+    <p id="hdr-allow-sub" style="font-size:11px;color:var(--muted);margin-top:2px">Food / Transportation / Hazard Pay by tier &amp; attendance eligibility</p>
   </div>
   <div class="header-right" style="display:flex;align-items:center;gap:12px;"><span id="datetime" style="font-size:11px;color:var(--muted);margin-right:16px;font-family:'DM Mono',monospace;"></span></div>
   <div class="theme-toggle">
@@ -383,12 +393,24 @@
     </div>
 
     <div>
+      <div class="section-title">Allowance Types</div>
+      <details class="cfg">
+        <summary id="allow-summary">Food · Transpo · Hazard</summary>
+        <div class="cfg-body">
+          <div class="hint">Rename an allowance, or remove one this client doesn't use. Removed allowances are hidden everywhere and left out of totals and exports. Their rates are kept, so you can restore them anytime.</div>
+          <div id="allow-rows"></div>
+          <div id="allow-removed"></div>
+        </div>
+      </details>
+    </div>
+
+    <div>
       <div class="section-title">Tier Rate Table</div>
       <details class="cfg">
-        <summary>Employee Tier · Food / Transpo / Hazard</summary>
+        <summary id="tier-summary">Employee Tier · Food / Transpo / Hazard</summary>
         <div class="cfg-body">
           <div class="hint">Prefilled from your Multi-M reference sheet. Edit amounts or add/remove tiers as needed.</div>
-          <div class="tier-head"><span>Job Code</span><span>Food</span><span>Transpo</span><span>Hazard</span></div>
+          <div class="tier-head"><span>Job Code</span><span>Food</span><span>Transpo</span><span>Hazard</span><span></span></div>
           <div id="tier-rows"></div>
           <button class="add-tier-btn" onclick="addTierRow()">+ Add tier</button>
         </div>
@@ -416,9 +438,9 @@
 
       <div class="stats-row">
         <div class="stat-card"><div class="stat-label">Employees</div><div class="stat-value" id="s-emp">0</div></div>
-        <div class="stat-card"><div class="stat-label">Total Food</div><div class="stat-value" id="s-food">₱0</div></div>
-        <div class="stat-card"><div class="stat-label">Total Transpo</div><div class="stat-value" id="s-transpo">₱0</div></div>
-        <div class="stat-card"><div class="stat-label">Total Hazard</div><div class="stat-value" id="s-hazard">₱0</div></div>
+        <div class="stat-card" id="sc-food"><div class="stat-label" id="sl-food">Total Food</div><div class="stat-value" id="s-food">₱0</div></div>
+        <div class="stat-card" id="sc-transpo"><div class="stat-label" id="sl-transpo">Total Transpo</div><div class="stat-value" id="s-transpo">₱0</div></div>
+        <div class="stat-card" id="sc-hazard"><div class="stat-label" id="sl-hazard">Total Hazard</div><div class="stat-value" id="s-hazard">₱0</div></div>
         <div class="stat-card"><div class="stat-label">Total Allowance</div><div class="stat-value" id="s-total">₱0</div></div>
       </div>
 
@@ -537,6 +559,38 @@ var DEFAULT_ELIG = {
   unverified:{food:false,transpo:false,hazard:false}
 };
 var eligibility = JSON.parse(JSON.stringify(DEFAULT_ELIG));
+var ORIGINAL_TIERS = JSON.parse(JSON.stringify(DEFAULT_TIERS)); // untouched copy — Reset restores from this
+
+// ════════════════════════════════════════════
+// ALLOWANCE TYPES — rename / remove
+// Three fixed slots (food / transpo / hazard). "Removing" one hides it everywhere
+// (tier table, matrix, results, popup, exports) and leaves it out of totals, but
+// keeps its rates so it can be restored. Renaming changes the label everywhere.
+// ════════════════════════════════════════════
+var ALLOW_KEYS = ['food','transpo','hazard'];
+var ALLOW_IDX  = {food:1, transpo:2, hazard:3};   // position inside a DEFAULT_TIERS row
+var ALLOW_DEFAULTS = {
+  food:    {label:'Food',    full:'Food',           enabled:true},
+  transpo: {label:'Transpo', full:'Transportation', enabled:true},
+  hazard:  {label:'Hazard',  full:'Hazard Pay',     enabled:true}
+};
+var allowMeta = JSON.parse(JSON.stringify(ALLOW_DEFAULTS));
+function activeAllow(){ return ALLOW_KEYS.filter(function(k){ return allowMeta[k].enabled; }); }
+function aLabel(k){ return allowMeta[k].label; }
+// Excel headers keep the long default names (Transportation / Hazard Pay) until renamed
+function aFull(k){ return allowMeta[k].label===ALLOW_DEFAULTS[k].label ? ALLOW_DEFAULTS[k].full : allowMeta[k].label; }
+function sanitizeAllowMeta(src){
+  var out = JSON.parse(JSON.stringify(ALLOW_DEFAULTS));
+  if(src && typeof src==='object'){
+    ALLOW_KEYS.forEach(function(k){
+      var m = src[k]; if(!m) return;
+      if(typeof m.label==='string' && m.label.trim()) out[k].label = m.label.trim().slice(0,24);
+      if(typeof m.enabled==='boolean') out[k].enabled = m.enabled;
+    });
+  }
+  if(!ALLOW_KEYS.some(function(k){ return out[k].enabled; })) out.food.enabled = true; // never zero allowances
+  return out;
+}
 
 // ════════════════════════════════════════════
 // TIER RATE TABLE UI
@@ -544,25 +598,53 @@ var eligibility = JSON.parse(JSON.stringify(DEFAULT_ELIG));
 function renderTierRows(){
   var wrap = document.getElementById('tier-rows');
   wrap.innerHTML = '';
+  var act = activeAllow();
+  var cols = '2.1fr '+act.map(function(){ return '.7fr'; }).join(' ')+' 18px';
+  var head = document.querySelector('.tier-head');
+  if(head){
+    head.style.gridTemplateColumns = cols;
+    head.innerHTML = '<span>Job Code</span>'+act.map(function(k){ return '<span>'+escapeHtml(aLabel(k))+'</span>'; }).join('')+'<span></span>';
+  }
   DEFAULT_TIERS.forEach(function(row, i){
     var div = document.createElement('div');
     div.className = 'tier-row';
+    div.style.gridTemplateColumns = cols;
     div.innerHTML =
-      '<input type="text" class="tier-name" value="'+row[0]+'" data-i="'+i+'" data-f="name" title="'+row[0]+'">' +
-      '<input type="number" value="'+row[1]+'" data-i="'+i+'" data-f="food" title="Food">' +
-      '<input type="number" value="'+row[2]+'" data-i="'+i+'" data-f="transpo" title="Transpo">' +
-      '<input type="number" value="'+row[3]+'" data-i="'+i+'" data-f="hazard" title="Hazard">';
+      '<input type="text" class="tier-name" value="'+escapeHtml(row[0])+'" data-i="'+i+'" data-f="name" title="'+escapeHtml(row[0])+'">' +
+      act.map(function(k){
+        return '<input type="number" value="'+row[ALLOW_IDX[k]]+'" data-i="'+i+'" data-f="'+k+'" title="'+escapeHtml(aLabel(k))+'">';
+      }).join('') +
+      '<button type="button" class="tier-remove" data-i="'+i+'" title="Remove this tier" aria-label="Remove tier">\u2715</button>';
     wrap.appendChild(div);
   });
   if(!wrap.dataset.listenerAttached){
     wrap.addEventListener('input', function(e){
       var t=e.target, i=+t.dataset.i, f=t.dataset.f;
+      if(isNaN(i) || !DEFAULT_TIERS[i]) return;
       if(f==='name') DEFAULT_TIERS[i][0]=t.value;
-      if(f==='food') DEFAULT_TIERS[i][1]=parseFloat(t.value)||0;
-      if(f==='transpo') DEFAULT_TIERS[i][2]=parseFloat(t.value)||0;
-      if(f==='hazard') DEFAULT_TIERS[i][3]=parseFloat(t.value)||0;
+      else if(ALLOW_IDX[f]) DEFAULT_TIERS[i][ALLOW_IDX[f]]=parseFloat(t.value)||0;
+    });
+    wrap.addEventListener('click', function(e){
+      var btn = e.target.closest('.tier-remove');
+      if(!btn) return;
+      removeTierRow(+btn.dataset.i);
     });
     wrap.dataset.listenerAttached = 'true';
+  }
+}
+function removeTierRow(i){
+  var row = DEFAULT_TIERS[i];
+  if(!row) return;
+  DEFAULT_TIERS.splice(i, 1);
+  renderTierRows();
+  // Employees already matched to this tier would silently drop to P0 — recompute and warn
+  var affected = (typeof employees!=='undefined' ? employees : []).filter(function(emp){ return emp.tier===row[0]; }).length;
+  if(affected>0){
+    showToast('Removed "'+row[0]+'" — '+affected+' loaded employee(s) matched to it will show \u20b10 until it is re-added or their Job Code is corrected.', 'warning', 8000);
+  }
+  // Only refresh if a report is already on screen — otherwise wait for Generate Report
+  if(typeof results!=='undefined' && results.length){
+    try{ computeAllowances(true); }catch(e){}
   }
 }
 function addTierRow(){
@@ -571,19 +653,104 @@ function addTierRow(){
 }
 
 // ════════════════════════════════════════════
+// ALLOWANCE TYPES UI
+// ════════════════════════════════════════════
+function renderAllowanceTypes(){
+  var rowsEl = document.getElementById('allow-rows');
+  var remEl  = document.getElementById('allow-removed');
+  if(!rowsEl || !remEl) return;
+  var act = activeAllow();
+  rowsEl.innerHTML = act.map(function(k){
+    var only = act.length===1;
+    return '<div class="allow-row">' +
+      '<input type="text" maxlength="24" value="'+escapeHtml(aLabel(k))+'" data-k="'+k+'" title="Rename this allowance" aria-label="Allowance name">' +
+      '<button type="button" class="tier-remove" data-k="'+k+'" '+(only?'disabled title="At least one allowance is required"':'title="Remove this allowance"')+' aria-label="Remove allowance">\u2715</button>' +
+    '</div>';
+  }).join('');
+  var gone = ALLOW_KEYS.filter(function(k){ return !allowMeta[k].enabled; });
+  remEl.innerHTML = gone.length
+    ? '<div class="allow-removed-label">Removed</div>' + gone.map(function(k){
+        return '<button type="button" class="allow-restore" data-k="'+k+'" title="Bring this allowance back">+ '+escapeHtml(aLabel(k))+'</button>';
+      }).join('')
+    : '';
+}
+function bindAllowanceTypeEvents(){
+  var rowsEl = document.getElementById('allow-rows');
+  var remEl  = document.getElementById('allow-removed');
+  if(!rowsEl || !remEl) return;
+  rowsEl.addEventListener('change', function(e){
+    var t = e.target;
+    if(!t.matches || !t.matches('input[data-k]')) return;
+    renameAllowance(t.dataset.k, t.value, t);
+  });
+  rowsEl.addEventListener('click', function(e){
+    var b = e.target.closest('.tier-remove');
+    if(b && !b.disabled) removeAllowance(b.dataset.k);
+  });
+  remEl.addEventListener('click', function(e){
+    var b = e.target.closest('.allow-restore');
+    if(b) restoreAllowance(b.dataset.k);
+  });
+}
+function renameAllowance(k, raw, inputEl){
+  var name = String(raw||'').trim().slice(0,24);
+  var revert = function(){ if(inputEl) inputEl.value = allowMeta[k].label; };
+  if(!name){ showToast('Allowance name cannot be empty.', 'warning', 3000); revert(); return; }
+  var clash = ALLOW_KEYS.some(function(o){ return o!==k && allowMeta[o].label.toLowerCase()===name.toLowerCase(); });
+  if(clash){ showToast('Another allowance is already named "'+name+'".', 'warning', 3500); revert(); return; }
+  allowMeta[k].label = name;
+  refreshAllowanceUI();
+}
+function removeAllowance(k){
+  if(activeAllow().length<=1){ showToast('At least one allowance is required.', 'warning', 3000); return; }
+  allowMeta[k].enabled = false;
+  refreshAllowanceUI();
+  if(results.length) computeAllowances(true);
+  showToast('Removed "'+allowMeta[k].label+'" — hidden from results and exports. Restore it anytime under Allowance Types.', 'success', 5000);
+}
+function restoreAllowance(k){
+  allowMeta[k].enabled = true;
+  refreshAllowanceUI();
+  if(results.length) computeAllowances(true);
+  showToast('Restored "'+allowMeta[k].label+'".', 'success', 3000);
+}
+// One place that re-labels / re-lays-out everything that mentions an allowance
+function refreshAllowanceUI(){
+  var act = activeAllow();
+  var sub = document.getElementById('hdr-allow-sub');
+  if(sub) sub.textContent = act.map(aFull).join(' / ')+' by tier & attendance eligibility';
+  var ts = document.getElementById('tier-summary');
+  if(ts) ts.textContent = 'Employee Tier · '+act.map(aLabel).join(' / ');
+  var as = document.getElementById('allow-summary');
+  if(as) as.textContent = act.map(aLabel).join(' · ');
+  ALLOW_KEYS.forEach(function(k){
+    var card = document.getElementById('sc-'+k), lab = document.getElementById('sl-'+k);
+    if(card) card.style.display = allowMeta[k].enabled ? '' : 'none';
+    if(lab) lab.textContent = 'Total '+aLabel(k);
+  });
+  var sr = document.querySelector('.stats-row');
+  if(sr) sr.style.gridTemplateColumns = 'repeat('+(2+act.length)+',1fr)';
+  renderAllowanceTypes();
+  renderTierRows();
+  renderEligTable();
+  if(results.length) renderResults();
+}
+
+// ════════════════════════════════════════════
 // ELIGIBILITY MATRIX UI
 // ════════════════════════════════════════════
 function renderEligTable(){
   var t = document.getElementById('elig-table');
-  var html = '<tr><th>Status</th><th class="c">Food</th><th class="c">Transpo</th><th class="c">Hazard</th></tr>';
+  var act = activeAllow(), cs = 1+act.length;
+  var html = '<tr><th>Status</th>'+act.map(function(k){ return '<th class="c">'+escapeHtml(aLabel(k))+'</th>'; }).join('')+'</tr>';
   ATT_STATUSES.forEach(function(label, i){
     var k = ATT_KEYS[i], e = eligibility[k];
     var isPrimary = (k==='onsite' || k==='wfh');
     if(i===0){
-      html += '<tr class="elig-group-label"><td colspan="4">Primary identifiers — every other status below ultimately resolves to one of these two (or to no allowance)</td></tr>';
+      html += '<tr class="elig-group-label"><td colspan="'+cs+'">Primary identifiers — every other status below ultimately resolves to one of these two (or to no allowance)</td></tr>';
     }
     if(i===2){
-      html += '<tr class="elig-group-label"><td colspan="4">Derived statuses</td></tr>';
+      html += '<tr class="elig-group-label"><td colspan="'+cs+'">Derived statuses</td></tr>';
     }
     var saBelowTip = 'Only applies when hours worked fall at or below half the shift, with no leave or Schedule Adjustment on file. Working more than half the shift gets full allowance based on Onsite/WFH, even if it is still short of the complete shift.';
     var labelCell = (k==='sa_below')
@@ -591,20 +758,21 @@ function renderEligTable(){
       : '<td>'+label+'</td>';
     html += '<tr'+(isPrimary?' class="elig-primary"':'')+'>' +
       labelCell +
-      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="food" '+(e.food?'checked':'')+'></td>' +
-      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="transpo" '+(e.transpo?'checked':'')+'></td>' +
-      '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="hazard" '+(e.hazard?'checked':'')+'></td>' +
+      act.map(function(a){ return '<td class="c"><input type="checkbox" data-k="'+k+'" data-f="'+a+'" '+(e[a]?'checked':'')+'></td>'; }).join('') +
       '</tr>';
     if(k==='wfh'){
-      html += '<tr class="elig-note-row"><td colspan="4">If an employee works half the day and takes leave for the other half, their allowance follows whatever applies to the half they worked — Onsite or WFH, as shown above.</td></tr>';
+      html += '<tr class="elig-note-row"><td colspan="'+cs+'">If an employee works half the day and takes leave for the other half, their allowance follows whatever applies to the half they worked — Onsite or WFH, as shown above.</td></tr>';
     }
   });
   t.innerHTML = html;
-  t.addEventListener('change', function(e){
-    var t2=e.target;
-    if(t2.type!=='checkbox') return;
-    eligibility[t2.dataset.k][t2.dataset.f] = t2.checked;
-  });
+  if(!t.dataset.listenerAttached){
+    t.addEventListener('change', function(e){
+      var t2=e.target;
+      if(t2.type!=='checkbox') return;
+      eligibility[t2.dataset.k][t2.dataset.f] = t2.checked;
+    });
+    t.dataset.listenerAttached = 'true';
+  }
 }
 
 // ════════════════════════════════════════════
@@ -1614,8 +1782,9 @@ function recomputeAttendance(){
 // ════════════════════════════════════════════
 // COMPUTE
 // ════════════════════════════════════════════
-function computeAllowances(){
+function computeAllowances(quiet){
   if(employees.length===0){ showToast('Upload an employee list first.', 'warning'); return; }
+  var act = activeAllow();
   results = employees.map(function(emp){
     var tierRow = DEFAULT_TIERS.find(function(t){return t[0]===emp.tier;});
     var rate = tierRow ? {food:tierRow[1],transpo:tierRow[2],hazard:tierRow[3]} : {food:0,transpo:0,hazard:0};
@@ -1624,17 +1793,16 @@ function computeAllowances(){
     // matches what you'd get by manually adding up the popup's rows, even when
     // the WFH/Leave merge overrides a day's original classification.
     var log = emp.dailyLog || [];
-    var food=0, transpo=0, hazard=0;
+    var sums = {food:0, transpo:0, hazard:0};
     log.forEach(function(d){
-      var e = eligibility[d.key] || {food:false,transpo:false,hazard:false};
-      if(e.food) food += rate.food;
-      if(e.transpo) transpo += rate.transpo;
-      if(e.hazard) hazard += rate.hazard;
+      var e = eligibility[d.key] || {};
+      act.forEach(function(k){ if(e[k]) sums[k] += rate[k]; });
     });
-    return {id:emp.id, name:emp.name, tier:emp.tier||'—', food:food, transpo:transpo, hazard:hazard, total:food+transpo+hazard, payrollType:emp.payrollType||''};
+    var total = act.reduce(function(sum,k){ return sum+sums[k]; }, 0);
+    return {id:emp.id, name:emp.name, tier:emp.tier||'—', food:sums.food, transpo:sums.transpo, hazard:sums.hazard, total:total, payrollType:emp.payrollType||''};
   });
   renderResults();
-  showToast('Computed allowances for '+results.length+' employees.', 'success');
+  if(!quiet) showToast('Computed allowances for '+results.length+' employees.', 'success');
 }
 
 function renderResults(){
@@ -1651,9 +1819,10 @@ function renderResults(){
     .filter(function(r){ return !tierCat || (r.tier||'').toUpperCase().indexOf(tierCat)===0; });
 
   document.getElementById('s-emp').textContent = results.length;
-  document.getElementById('s-food').textContent = '₱'+results.reduce((s,r)=>s+r.food,0).toLocaleString();
-  document.getElementById('s-transpo').textContent = '₱'+results.reduce((s,r)=>s+r.transpo,0).toLocaleString();
-  document.getElementById('s-hazard').textContent = '₱'+results.reduce((s,r)=>s+r.hazard,0).toLocaleString();
+  ALLOW_KEYS.forEach(function(k){
+    var el = document.getElementById('s-'+k);
+    if(el) el.textContent = '₱'+results.reduce(function(sum,r){ return sum+r[k]; },0).toLocaleString();
+  });
   document.getElementById('s-total').textContent = '₱'+results.reduce((s,r)=>s+r.total,0).toLocaleString();
 
   if(results.length===0){
@@ -1665,14 +1834,13 @@ function renderResults(){
     return;
   }
 
-  var html = '<table><thead><tr><th>Employee</th><th>Job Code</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th><th class="num">Total</th></tr></thead><tbody>';
+  var act = activeAllow();
+  var html = '<table><thead><tr><th>Employee</th><th>Job Code</th>'+act.map(function(k){ return '<th class="num">'+escapeHtml(aLabel(k))+'</th>'; }).join('')+'<th class="num">Total</th></tr></thead><tbody>';
   rows.forEach(function(r){
     html += '<tr class="clickable-row" style="cursor:pointer" data-emp-id="'+escapeHtml(r.id)+'" title="Click for daily breakdown">' +
       '<td><div class="emp-name">'+escapeHtml(r.name||'(no name)')+'</div><div class="emp-id">'+escapeHtml(r.id)+'</div></td>' +
       '<td><span class="tier-badge">'+escapeHtml(r.tier)+'</span></td>' +
-      '<td class="num allow-val '+(r.food===0?'allow-zero':'')+'">₱'+r.food.toLocaleString()+'</td>' +
-      '<td class="num allow-val '+(r.transpo===0?'allow-zero':'')+'">₱'+r.transpo.toLocaleString()+'</td>' +
-      '<td class="num allow-val '+(r.hazard===0?'allow-zero':'')+'">₱'+r.hazard.toLocaleString()+'</td>' +
+      act.map(function(k){ return '<td class="num allow-val '+(r[k]===0?'allow-zero':'')+'">₱'+r[k].toLocaleString()+'</td>'; }).join('') +
       '<td class="num allow-val">₱'+r.total.toLocaleString()+'</td>' +
       '</tr>';
   });
@@ -1705,15 +1873,11 @@ function openDayBreakdown(empId){
   // Quick-reference: what this tier actually earns if Onsite vs WFH, per the
   // current Eligibility Matrix — so it's clear at a glance without cross-checking.
   function cardHtml(label, elig){
-    var lineDefs = [
-      {name:'Food', on:!!elig.food, amt:rate.food},
-      {name:'Transpo', on:!!elig.transpo, amt:rate.transpo},
-      {name:'Hazard', on:!!elig.hazard, amt:rate.hazard}
-    ];
+    var lineDefs = activeAllow().map(function(k){ return {name:aLabel(k), on:!!elig[k], amt:rate[k]}; });
     var linesHtml = lineDefs.map(function(l){
       return '<div class="ti-line '+(l.on?'yes':'no')+'">' +
         '<span class="ti-check">'+(l.on?'✓':'✕')+'</span>' +
-        '<span>'+l.name+'</span>' +
+        '<span>'+escapeHtml(l.name)+'</span>' +
         (l.on ? '<span class="ti-amt">₱'+l.amt.toLocaleString()+'</span>' : '') +
         '</div>';
     }).join('');
@@ -1733,28 +1897,27 @@ function openDayBreakdown(empId){
     return;
   }
 
-  var totalFood=0, totalTranspo=0, totalHazard=0;
+  var act = activeAllow();
+  var tot = {food:0, transpo:0, hazard:0};
   var rowsHtml = log.map(function(d){
-    var elig = eligibility[d.key] || {food:false,transpo:false,hazard:false};
-    var food = elig.food ? rate.food : 0;
-    var transpo = elig.transpo ? rate.transpo : 0;
-    var hazard = elig.hazard ? rate.hazard : 0;
-    totalFood += food; totalTranspo += transpo; totalHazard += hazard;
-    var paid = (food+transpo+hazard)>0 || d.key==='leave' || d.key==='leave_half' || d.key==='restday_off'; // Leave (whole or half-day) and an unworked Rest Day are normal, expected outcomes — not problems
+    var elig = eligibility[d.key] || {};
+    var amt = {};
+    act.forEach(function(k){ amt[k] = elig[k] ? rate[k] : 0; tot[k] += amt[k]; });
+    var paidSum = act.reduce(function(sum,k){ return sum+amt[k]; }, 0);
+    var paid = paidSum>0 || d.key==='leave' || d.key==='leave_half' || d.key==='restday_off'; // Leave (whole or half-day) and an unworked Rest Day are normal, expected outcomes — not problems
     var label = displayLabel(d);
     return '<tr>' +
       '<td>'+escapeHtml(d.date||d.dateKey||'—')+'</td>' +
       '<td><span class="day-status-badge '+(paid?'paid':'')+'">'+escapeHtml(label)+'</span>'+(d.note?'<div style="font-size:8px;color:var(--muted);margin-top:1px">'+escapeHtml(d.note)+'</div>':'')+'</td>' +
-      '<td class="num">'+(food>0?'₱'+food.toLocaleString():'—')+'</td>' +
-      '<td class="num">'+(transpo>0?'₱'+transpo.toLocaleString():'—')+'</td>' +
-      '<td class="num">'+(hazard>0?'₱'+hazard.toLocaleString():'—')+'</td>' +
+      act.map(function(k){ return '<td class="num">'+(amt[k]>0?'₱'+amt[k].toLocaleString():'—')+'</td>'; }).join('') +
       '</tr>';
   }).join('');
 
   document.getElementById('day-modal-body').innerHTML =
-    '<table class="day-table"><thead><tr><th>Date</th><th>Status</th><th class="num">Food</th><th class="num">Transpo</th><th class="num">Hazard</th></tr></thead><tbody>'+rowsHtml+'</tbody></table>';
+    '<table class="day-table"><thead><tr><th>Date</th><th>Status</th>'+act.map(function(k){ return '<th class="num">'+escapeHtml(aLabel(k))+'</th>'; }).join('')+'</tr></thead><tbody>'+rowsHtml+'</tbody></table>';
   document.getElementById('day-modal-footer').innerHTML =
-    'Food: <b>₱'+totalFood.toLocaleString()+'</b> · Transpo: <b>₱'+totalTranspo.toLocaleString()+'</b> · Hazard: <b>₱'+totalHazard.toLocaleString()+'</b> · Total: <b>₱'+(totalFood+totalTranspo+totalHazard).toLocaleString()+'</b>';
+    act.map(function(k){ return escapeHtml(aLabel(k))+': <b>₱'+tot[k].toLocaleString()+'</b>'; })
+       .concat(['Total: <b>₱'+act.reduce(function(sum,k){ return sum+tot[k]; },0).toLocaleString()+'</b>']).join(' · ');
   document.getElementById('day-modal-backdrop').classList.add('show');
 }
 function closeDayModal(){
@@ -1768,8 +1931,12 @@ function exportSummary(){
   if(results.length===0){ showToast('Nothing to export yet.', 'warning'); return; }
   var hideZero = document.getElementById('hide-zero')?.checked;
   var filteredResults = results.filter(r=>!hideZero || r.total>0);
+  var act = activeAllow();
   var rows = filteredResults.map(function(r){
-    return {'Employee ID':r.id,'Employee Name':r.name,'Job Code':r.tier,'Food':r.food,'Transportation':r.transpo,'Hazard Pay':r.hazard,'Total':r.total};
+    var o = {'Employee ID':r.id,'Employee Name':r.name,'Job Code':r.tier};
+    act.forEach(function(k){ o[aFull(k)] = r[k]; });
+    o['Total'] = r.total;
+    return o;
   });
   var ws = XLSX.utils.json_to_sheet(rows);
   var wb = XLSX.utils.book_new();
@@ -1786,29 +1953,26 @@ function exportSummary(){
       var rate = tierRow ? {food:tierRow[1],transpo:tierRow[2],hazard:tierRow[3]} : {food:0,transpo:0,hazard:0};
       var log = (emp.dailyLog||[]).slice().sort(function(a,b){ return (a.dateKey||'')<(b.dateKey||'') ? -1 : 1; });
       log.forEach(function(d){
-        var elig = eligibility[d.key] || {food:false,transpo:false,hazard:false};
-        var food = elig.food ? rate.food : 0;
-        var transpo = elig.transpo ? rate.transpo : 0;
-        var hazard = elig.hazard ? rate.hazard : 0;
-        dailyRows.push({
+        var elig = eligibility[d.key] || {};
+        var rec = {
           'Employee ID': emp.id,
           'Employee Name': emp.name,
           'Job Code': emp.tier || '—',
           'Date': d.date || d.dateKey || '',
           'Status': displayLabel(d),
-          'Note': d.note || '',
-          'Food': food,
-          'Transportation': transpo,
-          'Hazard Pay': hazard,
-          'Daily Total': food+transpo+hazard
-        });
+          'Note': d.note || ''
+        };
+        var dayTotal = 0;
+        act.forEach(function(k){ var v = elig[k] ? rate[k] : 0; rec[aFull(k)] = v; dayTotal += v; });
+        rec['Daily Total'] = dayTotal;
+        dailyRows.push(rec);
       });
     });
   var ws2 = XLSX.utils.json_to_sheet(dailyRows);
   XLSX.utils.book_append_sheet(wb, ws2, 'Daily Breakdown');
 
   XLSX.writeFile(wb, 'Daily_Allowance_Summary_'+new Date().toISOString().slice(0,10)+'.xlsx');
-  logExport('Excel Summary', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+  logExport('Excel Summary', {tiers: DEFAULT_TIERS, eligibility: eligibility, allowances: allowMeta});
 }
 
 // ─── Adjustment Modal ───
@@ -1895,7 +2059,7 @@ function confirmAdjExport(){
     XLSX.writeFile(wbS, 'Daily_Allowance_Adjustment_Template_SemiMonthly_'+dateSuffix+'.xlsx');
     filesWritten++;
   }
-  logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+  logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility, allowances: allowMeta});
 
   if(excludedNames.length){
     showToast(excludedNames.length+' employee(s) excluded — no Payroll Type set (or unrecognized value) in the Employee List: '+excludedNames.slice(0,5).join(', ')+(excludedNames.length>5?', …':'')+'.', 'warning', 10000);
@@ -2000,7 +2164,7 @@ function exportAdjustmentFromTemplate(){
         filesWritten++;
       });
 
-      logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility});
+      logExport('Adjustment Template', {tiers: DEFAULT_TIERS, eligibility: eligibility, allowances: allowMeta});
 
       if(totalFilled===0 && filesWritten===0){
         showToast('No employees matched the template. Make sure IDs line up with your Employee List.', 'error', 9000);
@@ -2029,18 +2193,19 @@ function setAllConfigs(obj){
   try { localStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(obj)); } catch(e){}
 }
 function buildConfigSnapshot(){
-  return { tiers: JSON.parse(JSON.stringify(DEFAULT_TIERS)), eligibility: JSON.parse(JSON.stringify(eligibility)) };
+  return { tiers: JSON.parse(JSON.stringify(DEFAULT_TIERS)), eligibility: JSON.parse(JSON.stringify(eligibility)), allowances: JSON.parse(JSON.stringify(allowMeta)) };
 }
 function applyConfigSnapshot(snap){
   if(!snap || !snap.tiers || !snap.eligibility) return;
   // Replace DEFAULT_TIERS in-place
   DEFAULT_TIERS.length = 0;
   snap.tiers.forEach(function(t){ DEFAULT_TIERS.push(t); });
-  // Replace eligibility in-place
+  // Replace eligibility in-place (merged over defaults so older saves can't leave a status undefined)
   Object.keys(eligibility).forEach(function(k){ delete eligibility[k]; });
-  Object.assign(eligibility, snap.eligibility);
-  renderTierRows();
-  renderEligTable();
+  Object.assign(eligibility, JSON.parse(JSON.stringify(DEFAULT_ELIG)), snap.eligibility);
+  // Older saves have no allowance settings — those load with the default three
+  allowMeta = sanitizeAllowMeta(snap.allowances);
+  refreshAllowanceUI();
   if(employees.length) computeAllowances();
 }
 function updateConfigLabel(name){
@@ -2126,16 +2291,14 @@ function doDeleteConfig(name){
   setTimeout(loadConfig, 150);
 }
 function resetConfig(){
-  if(!confirm('Reset Tier Rate Table and Eligibility Matrix to defaults?')) return;
+  if(!confirm('Reset Tier Rate Table, Eligibility Matrix and Allowance Types to defaults?')) return;
   DEFAULT_TIERS.length = 0;
-  // Re-push the original hardcoded defaults
-  var orig = [["MANAGER - 1",200,350,175],["MANAGER - 2",200,350,175],["MANAGER - 3",200,350,175],["MANAGER - 4",200,350,175],["MANAGER - 5",200,350,175],["MANAGER - 6",200,350,175],["MANAGER - 7",200,350,175],["MANAGER - 8",200,350,175],["SUPERVISOR - 1",200,350,175],["SUPERVISOR - 2",200,350,175],["SUPERVISOR - 3",200,350,175],["SUPERVISOR - 4",200,350,175],["SUPERVISOR - 5",200,350,175],["SUPERVISOR - 6",200,350,175],["SUPERVISOR - 7",200,350,175],["SUPERVISOR - 8",200,350,175],["SUPERVISOR - 9",200,350,175],["SUPERVISOR - 10",200,350,175]];
-  orig.forEach(function(t){ DEFAULT_TIERS.push(t); });
-  var origElig = JSON.parse(JSON.stringify({onsite:{food:true,transpo:true,hazard:true},wfh:{food:true,transpo:false,hazard:false},late:{food:true,transpo:true,hazard:true},leave:{food:false,transpo:false,hazard:false},leave_half:{food:false,transpo:false,hazard:false},absent:{food:false,transpo:false,hazard:false},nwh:{food:false,transpo:false,hazard:false},halfday_unfiled:{food:false,transpo:false,hazard:false},sa_below:{food:false,transpo:false,hazard:false},unverified:{food:false,transpo:false,hazard:false}}));
+  ORIGINAL_TIERS.forEach(function(t){ DEFAULT_TIERS.push(t.slice()); });
   Object.keys(eligibility).forEach(function(k){ delete eligibility[k]; });
-  Object.assign(eligibility, origElig);
-  renderTierRows();
-  renderEligTable();
+  Object.assign(eligibility, JSON.parse(JSON.stringify(DEFAULT_ELIG)));
+  allowMeta = JSON.parse(JSON.stringify(ALLOW_DEFAULTS));
+  refreshAllowanceUI();
+  if(results.length) computeAllowances(true);
   updateConfigLabel('');
   showToast('Config reset to defaults.','success',3000);
 }
@@ -2143,8 +2306,8 @@ function resetConfig(){
 // ════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════
-renderTierRows();
-renderEligTable();
+bindAllowanceTypeEvents();
+refreshAllowanceUI();
 
 // ─── Tool Access Logging ───
 (function() {
