@@ -185,6 +185,8 @@ body{padding:10px;}
   .cfg-list-item-date{font-size:9px;color:var(--muted);}
   .cfg-list-item-del{background:none;border:none;cursor:pointer;color:#dc2626;font-size:12px;padding:2px 4px;opacity:.6;}
   .cfg-list-item-del:hover{opacity:1;}
+  .cfg-list-item-exp{background:none;border:none;cursor:pointer;color:var(--accent2);font-size:12px;padding:2px 4px;opacity:.7;}
+  .cfg-list-item-exp:hover{opacity:1;}
   .run-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px);}
   .run-btn:disabled{opacity:.35;cursor:not-allowed;}
   .recalc-note{font-size:10px;color:var(--muted);text-align:center;margin-top:6px;}
@@ -219,6 +221,13 @@ body{padding:10px;}
   .toggle-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;padding:0 4px;transition:transform .2s;line-height:1;}
   .toggle-btn.open{transform:rotate(90deg);color:var(--accent2);}
   .emp-name{font-weight:600;}
+  .id-warn{margin:0 0 14px;padding:12px 14px;border:1px solid var(--accent3);background:rgba(245,158,11,.10);border-radius:10px;font-size:11px;color:var(--text);line-height:1.5;}
+  .id-warn-head{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;}
+  .id-warn-head b{color:var(--accent3);}
+  .id-warn ul{margin:8px 0 0 16px;padding:0;color:var(--muted);}
+  .id-warn li{margin:3px 0;}
+  .id-warn-x{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;line-height:1;}
+  .id-warn-badge{display:inline-block;margin-left:6px;color:var(--accent3);cursor:help;font-size:11px;}
   .emp-id{font-family:'DM Mono',monospace;font-size:9px;color:var(--muted);margin-top:2px;}
   .grade-badge{display:inline-block;background:rgba(74,222,128,.12);color:var(--accent);font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:20px;border:1px solid rgba(74,222,128,.25);}
   /* Status bubble matches the grade bubble — same colour for every status */
@@ -494,6 +503,7 @@ body{padding:10px;}
         <div class="state-sub">No employees matched the eligibility criteria.<br>Adjust filters and re-generate.</div>
       </div>
       <div id="results-section" style="display:none">
+<div id="id-mismatch-banner" style="display:none"></div>
         <div class="stats-row">
           <div class="stat-card"><div class="stat-label">Eligible</div><div class="stat-value" id="s-eligible">0</div></div>
           <div class="stat-card"><div class="stat-label">With Allowance</div><div class="stat-value" id="s-with-ot">0</div></div>
@@ -891,6 +901,7 @@ async function confirmAdjExport(){
     if(added>0)msg+=' '+added+' added \u2014 not in the uploaded template.';
     if(without>0)msg+=' '+without+' without data '+(hideZero?'excluded':'grouped below')+'.';
     showToast(msg,'success',7000);
+    idMismatchExportNote([...daily,...monthly]);
     if(skipped.length){
       showToast(skipped.length+' employee(s) with allowance were left out \u2014 no Payroll Type set (or an unrecognized one) in the Employee List: '+skipped.slice(0,5).join(', ')+(skipped.length>5?', \u2026':'')+'.','warning',10000);
     }
@@ -952,15 +963,100 @@ function loadConfigNamed(){
   var overlay=document.createElement('div');
   overlay.className='cfg-modal-overlay';
   var listHtml=names.length?names.map(function(n){
-    var c=configs[n];
-    return '<div class="cfg-list-item" onclick="doLoadConfigV1(\''+esc(n)+'\')">'+
-      '<div><div class="cfg-list-item-name">'+esc(n)+'</div><div class="cfg-list-item-date">Saved: '+(c.savedAt||'')+'</div></div>'+
-      '<button class="cfg-list-item-del" onclick="event.stopPropagation();doDeleteConfigV1(\''+esc(n)+'\')">✕</button></div>';
-  }).join(''):'<div style="font-size:11px;color:var(--muted);padding:12px 0;">No saved configs yet — save one first.</div>';
-  overlay.innerHTML='<div class="cfg-modal"><h3>📂 Load Configuration</h3>'+listHtml+
-    '<div class="cfg-modal-btns" style="margin-top:8px;"><button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Close</button></div></div>';
-  document.body.appendChild(overlay);
+  var c=configs[n];
+  return '<div class="cfg-list-item" data-cfg="'+esc(n)+'" onclick="doLoadConfigV1(this.dataset.cfg)">'+
+    '<div><div class="cfg-list-item-name">'+esc(n)+'</div><div class="cfg-list-item-date">Saved: '+esc(c.savedAt||'')+'</div></div>'+
+    '<button class="cfg-list-item-exp" title="Download this config as a file to share" onclick="event.stopPropagation();doExportConfigV1(this.closest(\'.cfg-list-item\').dataset.cfg)">\u2B07</button>'+
+    '<button class="cfg-list-item-del" title="Delete" onclick="event.stopPropagation();doDeleteConfigV1(this.closest(\'.cfg-list-item\').dataset.cfg)">\u2715</button></div>';
+}).join(''):'<div style="font-size:11px;color:var(--muted);padding:12px 0;">No saved configs yet \u2014 save one first, or import one from a file.</div>';
+overlay.innerHTML='<div class="cfg-modal"><h3>\uD83D\uDCC2 Load Configuration</h3>'+listHtml+
+  '<div class="cfg-modal-btns" style="margin-top:8px;"><button class="cfg-modal-cancel-btn" onclick="document.getElementById(\'cfg-import-file\').click()">\u2B06 Import from file</button>'+
+  '<input type="file" id="cfg-import-file" accept=".json,application/json" style="display:none" onchange="importConfigV1(this)">'+
+  '<button class="cfg-modal-cancel-btn" onclick="this.closest(\'.cfg-modal-overlay\').remove()">Close</button></div></div>';
+document.body.appendChild(overlay);
   overlay.addEventListener('keydown',function(e){if(e.key==='Escape')overlay.remove();});
+}
+
+// ─── Share a config as a file ───
+function cleanCfgName(v){
+  // names end up in the list and in messages, so keep them plain text
+  // plain text only: tags/quotes/backslashes removed, but & and ' stay (names like "R&F" must survive)
+  return String(v==null?'':v).replace(/[\u0000-\u001f<>"`\\]/g,'').replace(/\s+/g,' ').trim().slice(0,60);
+}
+function sanitizeSnapshotV1(s){
+  // Rebuild a config from scratch, keeping only expected fields and shapes,
+  // so a file from anywhere can never inject odd values into the page.
+  if(!s||typeof s!=='object'||s.version!=='v1'||!Array.isArray(s.allowanceTypes))return null;
+  if(!s.allowanceTypes.length||s.allowanceTypes.length>20)return null;
+  const str=(v,max)=>String(v==null?'':v).replace(/[\u0000-\u001f<>]/g,'').slice(0,max);   // plain text only: no control chars, no tags
+  const num=v=>{const n=Number(v);return isFinite(n)&&n>=0?n:0;};
+  const SHIFTS=['Regular','Rest Day','Holiday'];
+  const types=[];
+  for(let i=0;i<s.allowanceTypes.length;i++){
+    const at=s.allowanceTypes[i];
+    if(!at||typeof at!=='object')return null;
+    const id=/^[A-Za-z0-9_-]{1,40}$/.test(String(at.id))?String(at.id):'t'+(i+1);
+    if(types.some(t=>t.id===id))return null;
+    types.push({
+      id,
+      name:str(at.name,80)||'Allowance '+(i+1),
+      color:/^#[0-9a-fA-F]{6}$/.test(String(at.color))?String(at.color):TYPE_COLORS[i%TYPE_COLORS.length],
+      shiftTypes:(Array.isArray(at.shiftTypes)?at.shiftTypes:[]).filter(x=>SHIFTS.includes(x)),
+      cols:(Array.isArray(at.cols)?at.cols:[]).slice(0,100).map(x=>str(x,60)).filter(Boolean),
+      brackets:(Array.isArray(at.brackets)?at.brackets:[]).slice(0,50).map(b=>({hours:num(b&&b.hours),amount:num(b&&b.amount)})),
+      adjType:str(at.adjType||'Allowance',60),
+      adjName:str(at.adjName||'Work Extension Allowance',80),
+      adjCode:str(at.adjCode||'Allowance',60),
+      beforeTax:at.beforeTax==='Yes'?'Yes':'No',
+      taxable:at.taxable==='No'?'No':'Yes',
+    });
+  }
+  const elig=(Array.isArray(s.eligFilters)?s.eligFilters:[]).slice(0,20)
+    .filter(f=>f&&typeof f.col==='string')
+    .map(f=>({col:str(f.col,80),values:(Array.isArray(f.values)?f.values:[]).slice(0,500).map(v=>str(v,120))}));
+  const mode=['perday','shifttype','accumulated'].includes(s.computeMode)?s.computeMode:'perday';
+  return {version:'v1',allowanceTypes:types,eligFilters:elig,computeMode:mode};
+}
+function doExportConfigV1(name){
+  const cfg=getAllConfigsV1()[name];
+  if(!cfg||!cfg.snapshot){showToast('Config not found.','error',3000);return;}
+  const payload={app:'allowance-toolkit',tool:'v1',exportedAt:new Date().toISOString(),name:name,snapshot:cfg.snapshot};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download='AllowanceToolkit_V1_Config_'+(cleanCfgName(name).replace(/[^\w.-]+/g,'_')||'config')+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  showToast('Config "'+esc(cleanCfgName(name))+'" downloaded. Send the file to your client \u2014 they can load it with Load \u2192 Import from file.','success',6000);
+}
+function importConfigV1(input){
+  const file=input.files&&input.files[0];
+  input.value='';                                   // lets the same file be chosen again later
+  if(!file)return;
+  if(file.size>1024*1024){showToast('Heads up! That file is too large to be a config file.','error',6000);return;}
+  const reader=new FileReader();
+  reader.onload=function(e){
+    let obj;
+    try{obj=JSON.parse(e.target.result);}
+    catch(_){showToast('Heads up! That file isn\'t a valid config file. Use a file downloaded from the Load \u2192 \u2B07 button.','error',7000);return;}
+    const snap=sanitizeSnapshotV1(obj&&obj.snapshot?obj.snapshot:obj);
+    if(!snap){showToast('Heads up! That doesn\'t look like a V1 (Bracket-Based) config file. Make sure it came from V1.','error',7000);return;}
+    let name=cleanCfgName(obj&&obj.name)||cleanCfgName(file.name.replace(/\.json$/i,'').replace(/^AllowanceToolkit_V1_Config_/,'').replace(/_/g,' '))||'Imported config';
+    const configs=getAllConfigsV1();
+    if(configs[name]){                              // never overwrite what's already saved
+      let n=2,base=name+' (imported)';
+      name=base;
+      while(configs[name]){name=base+' '+n;n++;}
+    }
+    configs[name]={snapshot:snap,savedAt:new Date().toLocaleString()+' (imported)'};
+    setAllConfigsV1(configs);
+    document.querySelector('.cfg-modal-overlay')?.remove();
+    showToast('Config "'+esc(name)+'" imported. Open Load to use it.','success',5000);
+    setTimeout(loadConfigNamed,150);
+  };
+  reader.onerror=function(){showToast('Couldn\'t read that file. Please try again.','error',5000);};
+  reader.readAsText(file);
 }
 function doLoadConfigV1(name){
   var configs=getAllConfigsV1();
@@ -1213,6 +1309,33 @@ function otWindowText(d){
   return real.map(([a,b])=>fmtClock(a)+' TO '+fmtClock(b)).join(', ');
 }
 
+// ─── ID / name mismatch check (Employee List vs Attendance Report) ───
+function nameTokens(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ').split(/\s+/).filter(t=>t.length>=2);
+}
+function namesPlausiblyMatch(a,b){
+  // Only flags a pair when the two names share NOT ONE word, so nicknames,
+  // middle names and spacing differences ("Delos" / "De Los") don't cause false alarms.
+  const ta=nameTokens(a),tb=nameTokens(b);
+  if(!ta.length||!tb.length)return true;
+  return ta.some(t=>tb.includes(t));
+}
+function renderIdMismatchBanner(list){
+  const el=document.getElementById('id-mismatch-banner');
+  if(!el)return;
+  if(!list.length){el.style.display='none';el.innerHTML='';return;}
+  const items=list.slice(0,10).map(r=>'<li><b>'+esc(r.employee_id)+'</b> \u2014 Employee List: \u201C'+esc(r.name)+'\u201D \u00B7 Attendance Report: \u201C'+esc(r.idMismatch)+'\u201D</li>').join('');
+  el.innerHTML='<div class="id-warn"><div class="id-warn-head"><div><b>\u26A0 ID mismatch</b> \u2014 '+list.length+' employee(s) have an ID that belongs to a different name in the Attendance Report. Their OT and allowance may really belong to someone else, so check these before exporting.</div>'+
+    '<button class="id-warn-x" title="Dismiss" onclick="document.getElementById(\'id-mismatch-banner\').style.display=\'none\'">\u2715</button></div>'+
+    '<ul>'+items+(list.length>10?'<li>\u2026and '+(list.length-10)+' more</li>':'')+'</ul></div>';
+  el.style.display='';
+}
+function idMismatchExportNote(rows){
+  const n=rows.filter(r=>r.idMismatch&&r.totalAllow>0).length;
+  if(n>0)showToast('\u26A0 '+n+' exported employee(s) have an ID/name mismatch between the Employee List and Attendance Report \u2014 check them before uploading.','warning',10000);
+}
+
 // ════════════════════════════════════════════
 // PARSE HELPERS
 // ════════════════════════════════════════════
@@ -1398,18 +1521,22 @@ async function processFiles(){
     const sumIdCol=sumRows.length?findCol(sumRows[0],['ID No','Employee ID','EmpID','ID']):null;
     const sumMap={};
     for(const row of sumRows){const id=String(row[sumIdCol]||'').trim();if(id)sumMap[id]=row;}
+    const sumFnCol=sumRows.length?findCol(sumRows[0],['First Name','FirstName','Given Name']):null;
+    const sumLnCol=sumRows.length?findCol(sumRows[0],['Last Name','LastName','Surname']):null;
+    const detNameMap={}; // empId → the name written in the Detailed sheet ("Last, First")
 
     // Parse Detailed sheet → per-day OT per allowance type → daily allowance
     const detWs=attWb.Sheets['Detailed']||attWb.Sheets[attWb.SheetNames[1]];
     const detRaw=detWs?XLSX.utils.sheet_to_json(detWs,{header:1,defval:''}):[];
     const detDayMap={}; // empId → [{date,day,shift,totalOT,byType,allowByType,dayAllow}]
-    let curId=null,inData=false;
+    let curId=null,curName='',inData=false;
     let detColMap={}; // column name → index
 
     for(const row of detRaw){
       const c0=String(row[0]||'').trim();
       const c1=String(row[1]||'').trim();
-      if(c0==='ID Number:'){curId=c1;inData=false;detDayMap[curId]=[];continue;}
+      if(c0==='Name:'){curName=c1;continue;}
+      if(c0==='ID Number:'){curId=c1;inData=false;detDayMap[curId]=[];detNameMap[curId]=curName;continue;}
       if(c0==='Date'&&String(row[7]||'').trim()==='Total OT'){
         inData=true;
         // Build column name → index map
@@ -1515,8 +1642,16 @@ async function processFiles(){
       }
       const totalAllow=Object.values(totalAllowByType).reduce((a,b)=>a+b,0);
 
+      // Same ID, different person? Compare the Employee List name with the name the attendance report has for that ID
+      const listName=`${emp[fnCol]||''} ${emp[lnCol]||''}`.trim();
+      const sumName=`${sumRow[sumFnCol]||''} ${sumRow[sumLnCol]||''}`.trim();
+      const attName=sumName||String(detNameMap[empId]||'').trim();
+      const hasAttendance=!!sumMap[empId]||!!detDayMap[empId];
+      const idMismatch=(hasAttendance&&attName&&listName&&!namesPlausiblyMatch(listName,attName))?attName:null;
+
       return{
         employee_id:empId,
+        idMismatch,
         name:`${emp[fnCol]||''} ${emp[lnCol]||''}`.trim(),
         department:String(emp[deptCol]||'—'),
         position:String(emp[posCol]||'—'),
@@ -1534,6 +1669,9 @@ async function processFiles(){
     populateTableFilters();
     hide('state-placeholder');hide('state-empty');show('results-section');
     updateStats();renderTable();
+    const mismatched=allRecords.filter(r=>r.idMismatch);
+    renderIdMismatchBanner(mismatched);
+    if(mismatched.length)showToast('\u26A0 '+mismatched.length+' ID mismatch(es) found \u2014 see the warning at the top of the results.','warning',8000);
     const n=document.getElementById('recalc-note');n.textContent='Adjust settings and Re-generate to update';n.classList.remove('dirty');
 
   }catch(err){showToast('Error: '+err.message,'error',8000);}
@@ -1569,8 +1707,8 @@ function buildTableHeaders(){
 function populateTableFilters(){
   const depts=[...new Set(allRecords.map(r=>r.department).filter(d=>d&&d!=='—'))].sort();
   const stats=[...new Set(allRecords.map(r=>r.status).filter(s=>s&&s!=='—'))].sort();
-  document.getElementById('dept-filter').innerHTML='<option value="">All Departments</option>'+depts.map(d=>`<option>${d}</option>`).join('');
-  document.getElementById('status-filter').innerHTML='<option value="">All Statuses</option>'+stats.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('dept-filter').innerHTML='<option value="">All Departments</option>'+depts.map(d=>`<option>${esc(d)}</option>`).join('');
+  document.getElementById('status-filter').innerHTML='<option value="">All Statuses</option>'+stats.map(s=>`<option>${esc(s)}</option>`).join('');
 }
 
 function updateStats(){
@@ -1668,10 +1806,10 @@ function renderTable(){
     const totalTypeCols=2+allowanceTypes.length*2;
     const summaryRow=`<tr class="summary-row" onclick="toggleDetail(${ri})">
       <td><button class="toggle-btn" id="toggle-${ri}">▶</button></td>
-      <td><div class="emp-name">${r.name}</div><div class="emp-id">${r.employee_id}</div></td>
-      <td>${r.department}</td><td>${r.position}</td>
+      <td><div class="emp-name">${esc(r.name)}${r.idMismatch?`<span class="id-warn-badge" title="${esc('ID '+r.employee_id+' belongs to \u201C'+r.idMismatch+'\u201D in the Attendance Report')}">\u26A0</span>`:''}</div><div class="emp-id">${esc(r.employee_id)}</div></td>
+      <td>${esc(r.department)}</td><td>${esc(r.position)}</td>
       <td><span class="grade-badge">L${r.job_grade}</span></td>
-      <td><span class="status-badge ${sc}">${r.status}</span></td>
+      <td><span class="status-badge ${sc}">${esc(r.status)}</span></td>
       <td class="num">${r.days_present}</td>
       ${typeCells}
       <td class="num"><span style="${r.totalOT>0?'font-weight:600':'color:var(--muted)'}">${r.totalOT>0?toHHMM(r.totalOT):'—'}</span></td>
@@ -1682,7 +1820,7 @@ function renderTable(){
       <td colspan="${totalTypeCols+7}">
         <div class="detail-inner">
 
-          <div class="detail-title">OT Days · ${r.name}</div>
+          <div class="detail-title">OT Days · ${esc(r.name)}</div>
           <table class="day-table" style="margin-bottom:14px">
             <thead><tr>
               <th>Date</th><th>Day</th><th>Shift / OT Hours</th><th>Breakdown</th><th class="r">Day Allow</th>
@@ -1786,6 +1924,7 @@ function exportExcel(){
   ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:headerRowIdx,c:0},e:{r:totalRows-2,c:headers.length-1}})};
   XLSX.utils.book_append_sheet(wb,ws,'Allowance Summary');
   XLSX.writeFile(wb,'Allowance_Report_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  idMismatchExportNote(rows);
   logExport('Excel Summary', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
 }
 
@@ -1827,6 +1966,7 @@ function exportPayroll(){
   }
   ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rowIdx-1,c:range.e.c}});
   XLSX.writeFile(wb,'Allowance_Payroll_Instruction_'+new Date().toISOString().slice(0,10)+'.xlsx',{cellStyles:true});
+  idMismatchExportNote(rows);
   logExport('Payroll Instruction', {version:'v1', allowanceTypes:allowanceTypes, eligFilters:eligFilters, computeMode:computeMode});
 }
 
